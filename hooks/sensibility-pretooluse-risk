@@ -1,0 +1,61 @@
+#!/usr/bin/env python3
+import os
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lib"))
+import hook  # noqa: E402
+
+FORBIDDEN_UNQUOTED = set(";&|`><\n$")
+FLAGS = {"deletes": "deletes or overwrites data", "remote": "changes a remote system",
+         "system_config": "changes configuration outside the project", "out_of_scope": "is outside what the user asked"}
+
+
+def is_simple(command):
+    quote = None
+    i = 0
+    while i < len(command):
+        c = command[i]
+        if quote == "'":
+            if c == "'":
+                quote = None
+        elif quote == '"':
+            if c == "\\":
+                i += 1
+            elif c == '"':
+                quote = None
+            elif c in "$`":
+                return False
+        elif c == "\\":
+            i += 1
+        elif c in "'\"":
+            quote = c
+        elif c in FORBIDDEN_UNQUOTED:
+            return False
+        i += 1
+    return quote is None
+
+
+def decision(kind, reason):
+    return {"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": kind, "permissionDecisionReason": reason}}
+
+
+def main(event):
+    command = event.get("tool_input", {}).get("command", "")
+    judge = os.path.join(os.environ.get("CLAUDE_PLUGIN_ROOT", ""), "skills/judge/scripts/judge.py") + " "
+    if command.startswith(judge) and is_simple(command):
+        hook.emit(decision("allow", "sensibility judge command"))
+        return
+    if not hook.enabled("BASH_GATE", "true"):
+        return
+    state = {"command": command, "cwd": event.get("cwd", ""), "prompt": hook.last_prompt(event.get("transcript_path", ""))}
+    judged, warning = hook.judge("risk", state, event, skip=() if state["prompt"] else ("out_of_scope",))
+    hook.emit(warning)
+    if not judged or judged[0] != "escalate":
+        return
+    verdict, rule, answers = judged
+    flagged = [text for q, text in FLAGS.items() if q in answers and answers[q]["noul"] >= 0.5]
+    summary = f"risk {answers['risk']['score']:.1f}/3" + (", " + ", ".join(flagged) if flagged else "")
+    hook.emit(decision("ask", f"Sensibility risk gate: {summary} ({rule})"))
+
+hook.run(main)

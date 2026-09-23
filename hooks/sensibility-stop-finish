@@ -1,0 +1,31 @@
+#!/usr/bin/env python3
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lib"))
+import hook  # noqa: E402
+
+NUDGES = {
+    "promises_work": "your reply leaves requested work undone while offering to do it",
+    "needless_permission": "your reply asks permission for something the user already asked for",
+    "plan_only": "your reply ends on a plan without the result the user asked for",
+}
+
+
+def main(event):
+    if not hook.enabled("STOP_GATE", "false") or event.get("stop_hook_active"):
+        return
+    state = {"prompt": hook.last_prompt(event.get("transcript_path", "")), "reply": event.get("last_assistant_message", "")}
+    judged, warning = hook.judge("finish", state, event)
+    hook.emit(warning)
+    if not judged or judged[0] != "escalate":
+        return
+    fired = [NUDGES[q] for q, a in judged[2].items() if a.get("noul", 0) >= 0.8]
+    hook.emit({"hookSpecificOutput": {
+        "hookEventName": "Stop",
+        "additionalContext": "Sensibility finish gate: " + "; ".join(fired)
+        + ". If that is right, do the work now instead of ending the turn. If the user genuinely has to decide, end the turn as is.",
+    }})
+
+
+hook.run(main)

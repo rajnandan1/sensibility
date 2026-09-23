@@ -1,0 +1,49 @@
+{
+  "description": "Finish gate: does Claude's final reply stop short of what the user asked",
+  "state": {
+    "description": "`prompt`: the user's last message. `reply`: Claude's final message for that turn.",
+    "keys": [
+      "prompt",
+      "reply"
+    ]
+  },
+  "questions": {
+    "promises_work": {
+      "type": "noul",
+      "instructions": "Does `reply` leave part of what `prompt` asked for undone, while offering or promising to do it?",
+      "criteria": {
+        "true": "Some requested work is missing and the reply offers or promises it (\"Want me to fix it?\", \"Next I will...\", \"I can do the rest\").",
+        "false": "The requested work is done, or the reply stops to confirm a destructive or irreversible step. Offering an optional extra beyond the prompt does not count."
+      }
+    },
+    "needless_permission": {
+      "type": "noul",
+      "instructions": "Does `reply` ask the user's permission for something `prompt` already asked for or clearly authorised?",
+      "criteria": {
+        "true": "It asks to do what the prompt already requested, with nothing risky to confirm.",
+        "false": "It asks nothing, asks about something the prompt did not cover, or confirms a destructive or irreversible step before taking it."
+      }
+    },
+    "plan_only": {
+      "type": "noul",
+      "instructions": "Does `reply` end on a plan or list of next steps without delivering a result for `prompt`?",
+      "criteria": {
+        "true": "The reply is a plan or intention; the requested result is not there.",
+        "false": "The requested result is delivered, the prompt only asked for a plan, the reply explains what blocked the work, or it stops to confirm a destructive or irreversible step."
+      }
+    }
+  },
+  "gate": {
+    "rules": [
+      {
+        "verdict": "escalate",
+        "any": [
+          "promises_work.noul >= 0.8",
+          "needless_permission.noul >= 0.8",
+          "plan_only.noul >= 0.8"
+        ]
+      }
+    ],
+    "default": "act"
+  }
+}

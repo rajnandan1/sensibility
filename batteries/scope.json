@@ -1,0 +1,31 @@
+{
+  "description": "Does a diff do what its ticket asked, and only that",
+  "state": {
+    "description": "`ticket`: the ticket or issue text. `diff`: the unified diff of the change.",
+    "keys": ["ticket", "diff"]
+  },
+  "questions": {
+    "in_scope": {
+      "type": "noul",
+      "instructions": "Is every change in `diff` something `ticket` asks for or directly requires?",
+      "criteria": { "true": "Each hunk serves the ticket.", "false": "At least one hunk does work the ticket does not ask for." }
+    },
+    "complete": {
+      "type": "noul",
+      "instructions": "Does `diff` do everything `ticket` asks for?",
+      "criteria": { "true": "Every requested change is present.", "false": "Some requested change is missing." }
+    },
+    "unrelated_change": {
+      "type": "noul",
+      "instructions": "Does `diff` contain a change unrelated to `ticket`, such as a refactor, rename, reformat, or fix of something else?",
+      "criteria": { "true": "There is at least one such unrelated change.", "false": "Every change relates to the ticket." }
+    }
+  },
+  "gate": {
+    "rules": [
+      { "verdict": "escalate", "any": ["unrelated_change.noul >= 0.7", "complete.noul < 0.3"] },
+      { "verdict": "confirm", "any": ["unrelated_change.noul >= 0.4", "complete.noul < 0.6", "in_scope.noul < 0.5"] }
+    ],
+    "default": "act"
+  }
+}

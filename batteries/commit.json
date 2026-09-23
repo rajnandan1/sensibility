@@ -1,0 +1,31 @@
+{
+  "description": "Does a commit message say what changed and why, and match its diff",
+  "state": {
+    "description": "`message`: the commit message. `diff`: the unified diff of the commit.",
+    "keys": ["message", "diff"]
+  },
+  "questions": {
+    "says_what": {
+      "type": "noul",
+      "instructions": "Does `message` say what the change in `diff` does, in terms a reader of the log can use?",
+      "criteria": { "true": "A reader learns what changed from the message alone.", "false": "The message is vague (\"fix\", \"updates\", \"wip\") or names files without saying what changed." }
+    },
+    "says_why": {
+      "type": "noul",
+      "instructions": "Does `message` say why the change is made, beyond restating what changed?",
+      "criteria": { "true": "It gives a reason, bug, ticket, or motivation.", "false": "It only describes the change itself." }
+    },
+    "mismatch": {
+      "type": "noul",
+      "instructions": "Does `message` claim something `diff` does not do, or leave out a major change that `diff` makes?",
+      "criteria": { "true": "The message and the diff disagree, or a significant part of the diff goes unmentioned.", "false": "Everything the message claims is in the diff, and every significant change in the diff is covered." }
+    }
+  },
+  "gate": {
+    "rules": [
+      { "verdict": "escalate", "any": ["mismatch.noul >= 0.7", "says_what.noul < 0.3"] },
+      { "verdict": "confirm", "any": ["mismatch.noul >= 0.4", "says_what.noul < 0.6", "says_why.noul < 0.5"] }
+    ],
+    "default": "act"
+  }
+}

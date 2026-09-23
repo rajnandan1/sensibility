@@ -1,0 +1,39 @@
+{
+  "description": "Taste: how clearly a PR or issue description reads to someone new",
+  "state": {
+    "description": "`text`: the PR or issue description.",
+    "keys": ["text"]
+  },
+  "questions": {
+    "actionable": {
+      "type": "score",
+      "instructions": "Could an engineer new to this codebase act on `text` without asking the author anything?",
+      "criteria": [
+        "No: the goal itself is unclear.",
+        "The goal is clear, but what to do or check is missing.",
+        "Mostly: one or two details would need a question.",
+        "Yes: goal, changes, and how to verify are all there."
+      ]
+    },
+    "ambiguity": {
+      "type": "score",
+      "instructions": "How many different readings of what `text` asks for or claims would a careful reader find?",
+      "criteria": [
+        "One reading only.",
+        "One main reading, with a minor detail open to interpretation.",
+        "Two plausible readings of something that matters.",
+        "Several readings; the reader would have to guess."
+      ]
+    },
+    "padding": {
+      "type": "score",
+      "instructions": "How much of `text` is filler: preamble, hedging, restated points, headers and ceremony that carry no information?",
+      "criteria": [
+        "None: every sentence carries information.",
+        "A sentence or two could go.",
+        "A noticeable share could go without losing anything.",
+        "Most of it is filler around a small point."
+      ]
+    }
+  }
+}
