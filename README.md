@@ -60,7 +60,7 @@ flowchart LR
     J --> K["answers + verdict"]
 ```
 
-**The judge skill** runs when you or Claude ask for it. It can use any battery, or questions Claude writes on the spot.
+**The judge skill** runs when you or Claude ask for it. Every battery you run by hand goes through it, and it can also ask questions Claude writes on the spot.
 
 **The two gates** are hooks. They run on their own, each with its own battery:
 
@@ -160,8 +160,10 @@ ALTER TABLE customers DROP COLUMN fax;
 You ask:
 
 ```
-Check the new migrations in my uncommitted change with the migration battery.
+/sensibility:judge check the new migrations in my uncommitted change with the migration battery
 ```
+
+Batteries always run through the judge skill. Typing `/sensibility:judge` is the sure way to start it. Plain wording like "check my migrations with the migration battery" works too, since Claude loads the judge skill by itself when you mention a battery; it did in every test run.
 
 Claude runs the battery once per migration. Each run is one command, and the script reads the file and the diff itself:
 
@@ -262,7 +264,7 @@ Jev can't count or do arithmetic, so leave rules like "at most 3 lines" or "unde
 
 Claude only runs a battery when something tells it to. You have three options, from least to most automatic:
 
-1. **Ask each time:** "check this with the `migration` battery".
+1. **Ask each time:** `/sensibility:judge check this with the migration battery`.
 2. **Add a line to your `CLAUDE.md`:** *"Before you commit a database migration, run the migration battery on it."* Claude then does it at that point on its own. This is enough for most rules.
 3. **Write a hook** that calls `judge.py` on every matching event. Only worth it for a check that must never be skipped, since each run adds about 0.5 s.
 
@@ -349,6 +351,13 @@ Yes. The Risk gate uses the `risk` battery and the Finish gate uses `finish`. To
 <summary><b>If batteries decide what a gate does, why are there on/off options?</b></summary>
 
 A battery decides how a gate judges. The option decides whether it runs at all. When a gate is off, its hook exits straight away: no call to Jev, no delay, nothing sent to TypeSafe. A battery that always says `act` would still call Jev on every event.
+
+</details>
+
+<details>
+<summary><b>How do I run a battery? Do I need to type <code>/sensibility:judge</code>?</b></summary>
+
+Batteries run through the judge skill. The sure way is `/sensibility:judge check this with the migration battery`. Plain wording like "check this with the migration battery" also works, because Claude loads the judge skill itself when you mention a battery. You never call a battery directly, and it doesn't have a command of its own.
 
 </details>
 
