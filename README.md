@@ -53,19 +53,13 @@ Without a key, the judge skill prints these steps and stops. The gates turn them
 
 ## Turn the gates on or off
 
-Set both options in `~/.claude/settings.json`:
+In Claude Code, run `/plugin configure sensibility@sensibility`. You can also set them when you install:
 
-```json
-{
-  "pluginConfigs": {
-    "sensibility@sensibility": {
-      "options": { "stop_gate": true, "bash_gate": true }
-    }
-  }
-}
+```sh
+claude plugin install sensibility@sensibility --config stop_gate=true
 ```
 
-`stop_gate` controls the Finish gate (default `false`) and `bash_gate` controls the Risk gate (default `true`). Restart Claude Code after you change them. With `--plugin-dir`, the key is `sensibility@inline`.
+`stop_gate` controls the Finish gate (default `false`) and `bash_gate` controls the Risk gate (default `true`). Restart Claude Code after you change them.
 
 The Finish gate ships off because, over 51 real turns, it fired 3 times and was right about once. Each wrong nudge costs an extra model turn. Turn it on if Claude keeps ending with "want me to fix it?" on work you already asked for.
 
