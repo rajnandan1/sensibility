@@ -29,7 +29,19 @@ Use the sensibility judge to check my uncommitted change against this ticket: <p
 
 Claude runs one command and reports a verdict (`act`, `confirm` or `escalate`) with the numbers behind it. If something is off, it tells you what.
 
-You also need `python3` 3.9 or later on your PATH. macOS has it after `xcode-select --install`. Tested on Claude Code 2.1.280.
+**5. Save a check you want to reuse.** A battery is that check: a few questions, saved under a name, so you can run the same one again. You describe the rule. Claude writes the file and tries it on examples before saving.
+
+```
+/sensibility:battery make a battery called comment: keep a code comment only if it explains something the code itself can't
+```
+
+**6. Use that check.** Next time, ask the judge to run it by name:
+
+```
+/sensibility:judge check this comment with the comment battery: # increment the retry counter
+```
+
+You also need `python3` 3.9 or later on your PATH. macOS has it after `xcode-select --install`.
 
 ## How it works
 
@@ -64,27 +76,27 @@ flowchart LR
 
 **The two gates** are hooks. They run on their own, each with its own battery:
 
-| Gate | Runs when | What it does | Default |
-| --- | --- | --- | --- |
-| Finish gate | Claude ends a turn | If Claude stopped short (offered to do the work instead of doing it, asked permission you already gave, ended on a plan), Claude gets one nudge to keep going. | **on** |
-| Risk gate | Before every Bash command | If a command is risky and destructive, or risky and outside what you asked for, Claude Code stops and asks you first. | **off** |
+| Gate        | Runs when                 | What it does                                                                                                                                                   | Default |
+| ----------- | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| Finish gate | Claude ends a turn        | If Claude stopped short (offered to do the work instead of doing it, asked permission you already gave, ended on a plan), Claude gets one nudge to keep going. | **on**  |
+| Risk gate   | Before every Bash command | If a command is risky and destructive, or risky and outside what you asked for, Claude Code stops and asks you first.                                          | **off** |
 
 **The battery skill** (`/sensibility:battery`) turns a rule of yours into a new battery and tests it before saving. See [Batteries](#batteries).
 
 ## Things to ask Claude
 
-| You want to | Say something like | What runs |
-| --- | --- | --- |
-| Check a change against its ticket | "Use the sensibility judge to check my uncommitted change against TICKET.md" | `scope` battery |
-| Check a commit message | "Use the sensibility judge to check my last commit message against its diff" | `commit` battery |
-| Rate a PR or issue description | "Use the sensibility judge to score how clear this PR description is: ..." | `clarity` battery |
-| Pick between options | "Use the sensibility judge to pick which of these three approaches best fits the ticket" | questions Claude writes on the spot |
-| Save a rule as a check | "/sensibility:battery make a battery called migration: a database migration must be reversible and must not lock a large table" | the battery skill |
-| See every battery | "List the sensibility batteries" | `judge.py --list` |
+| You want to                       | Say something like                                                                                                              | What runs                           |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| Check a change against its ticket | "Use the sensibility judge to check my uncommitted change against TICKET.md"                                                    | `scope` battery                     |
+| Check a commit message            | "Use the sensibility judge to check my last commit message against its diff"                                                    | `commit` battery                    |
+| Rate a PR or issue description    | "Use the sensibility judge to score how clear this PR description is: ..."                                                      | `clarity` battery                   |
+| Pick between options              | "Use the sensibility judge to pick which of these three approaches best fits the ticket"                                        | questions Claude writes on the spot |
+| Save a rule as a check            | "/sensibility:battery make a battery called migration: a database migration must be reversible and must not lock a large table" | the battery skill                   |
+| See every battery                 | "List the sensibility batteries"                                                                                                | `judge.py --list`                   |
 
 ### Example: catching a change the ticket didn't ask for
 
-The ticket says: *page 2 repeats the last item of page 1. Fix the slice. Nothing else is broken.* The diff fixes the slice, but it also changes `total_pages(count, size=20)` to `size=25`.
+The ticket says: _page 2 repeats the last item of page 1. Fix the slice. Nothing else is broken._ The diff fixes the slice, but it also changes `total_pages(count, size=20)` to `size=25`.
 
 ```mermaid
 sequenceDiagram
@@ -100,12 +112,12 @@ sequenceDiagram
     Claude-->>You: Don't commit yet. Keep the slice fix, put size back to 20.
 ```
 
-| Question | Answer | With `size=20` restored |
-| --- | --- | --- |
-| Is every change something the ticket asks for? | 0.05 | 0.97 |
-| Does the diff do everything the ticket asks? | 0.48 | 0.96 |
-| Is there an unrelated change? | 0.93 | 0.03 |
-| Verdict | `escalate` | `act` |
+| Question                                       | Answer     | With `size=20` restored |
+| ---------------------------------------------- | ---------- | ----------------------- |
+| Is every change something the ticket asks for? | 0.05       | 0.97                    |
+| Does the diff do everything the ticket asks?   | 0.48       | 0.96                    |
+| Is there an unrelated change?                  | 0.93       | 0.03                    |
+| Verdict                                        | `escalate` | `act`                   |
 
 The script read the ticket and ran `git diff` itself, so Claude got the verdict without loading the diff first. The numbers come from a real run; repeat runs moved them by a few hundredths and always gave the same verdict.
 
@@ -115,13 +127,13 @@ A battery is a check you can reuse. It's a small JSON file that holds a few ques
 
 Five batteries come with the plugin:
 
-| Battery | Checks | Used by |
-| --- | --- | --- |
-| `scope` | does a diff do what its ticket asked, and only that | judge skill |
-| `commit` | does a commit message say what changed and why, and match its diff | judge skill |
+| Battery   | Checks                                                                | Used by     |
+| --------- | --------------------------------------------------------------------- | ----------- |
+| `scope`   | does a diff do what its ticket asked, and only that                   | judge skill |
+| `commit`  | does a commit message say what changed and why, and match its diff    | judge skill |
 | `clarity` | how clearly a PR or issue description reads (scores only, no verdict) | judge skill |
-| `risk` | how irreversible and far-reaching a shell command is | Risk gate |
-| `finish` | whether Claude's last reply stops short of what you asked | Finish gate |
+| `risk`    | how irreversible and far-reaching a shell command is                  | Risk gate   |
+| `finish`  | whether Claude's last reply stops short of what you asked             | Finish gate |
 
 Your own batteries go in `~/.claude/sensibility/batteries/` (every project) or `.claude/sensibility/batteries/` inside a repo (that repo only).
 
@@ -173,11 +185,11 @@ judge.py migration --state-file migration=migrations/0044_drop_customer_fax.sql 
 
 **4. Read the results.** These are the real answers:
 
-| Migration | Irreversible | Drops a column still in use | Locks the table | Verdict |
-| --- | --- | --- | --- | --- |
-| `0042_add_coupon_code` | 0.04 | 0.05 | 0.09 | `act` |
-| `0043_index_orders_created_at` | 0.03 | 0.06 | 0.72 | `escalate` |
-| `0044_drop_customer_fax` | 0.06 | 0.74 | 0.23 | `escalate` |
+| Migration                      | Irreversible | Drops a column still in use | Locks the table | Verdict    |
+| ------------------------------ | ------------ | --------------------------- | --------------- | ---------- |
+| `0042_add_coupon_code`         | 0.04         | 0.05                        | 0.09            | `act`      |
+| `0043_index_orders_created_at` | 0.03         | 0.06                        | 0.72            | `escalate` |
+| `0044_drop_customer_fax`       | 0.06         | 0.74                        | 0.23            | `escalate` |
 
 Claude then checked both flagged files itself and said:
 
@@ -197,56 +209,70 @@ From then on, Claude checks every migration it writes without being asked.
 
 Every battery has the same four parts. Here they are for `migration.json`:
 
-| Part | In `migration.json` | What it's for |
-| --- | --- | --- |
-| `description` | "Is a database migration reversible, deploy-safe for dropped/renamed columns, and free of large table locks" | One line shown when you list batteries. |
-| `state` | two keys: `migration` and `diff` | What text the battery expects. A key named `diff` can be filled straight from git with `--git-diff`. |
-| `questions` | three yes/no questions: `irreversible`, `drop_in_same_deploy`, `locks_table` | What Jev is asked. Each one spells out what counts as yes and what counts as no, including the tricky cases: a constant default like `false` doesn't lock the table, `now()` does. |
-| `gate` | any score of 0.6 or more: `escalate`. Any of 0.5 or more: `confirm`. Otherwise: `act`. | Turns the scores into one verdict. Rules are checked in order and the first match wins. |
+| Part          | In `migration.json`                                                                                          | What it's for                                                                                                                                                                      |
+| ------------- | ------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `description` | "Is a database migration reversible, deploy-safe for dropped/renamed columns, and free of large table locks" | One line shown when you list batteries.                                                                                                                                            |
+| `state`       | two keys: `migration` and `diff`                                                                             | What text the battery expects. A key named `diff` can be filled straight from git with `--git-diff`.                                                                               |
+| `questions`   | three yes/no questions: `irreversible`, `drop_in_same_deploy`, `locks_table`                                 | What Jev is asked. Each one spells out what counts as yes and what counts as no, including the tricky cases: a constant default like `false` doesn't lock the table, `now()` does. |
+| `gate`        | any score of 0.6 or more: `escalate`. Any of 0.5 or more: `confirm`. Otherwise: `act`.                       | Turns the scores into one verdict. Rules are checked in order and the first match wins.                                                                                            |
 
 <details>
 <summary>Show the full <code>migration.json</code></summary>
 
 ```json
 {
-  "description": "Is a database migration reversible, deploy-safe for dropped/renamed columns, and free of large table locks",
-  "state": {
-    "description": "`migration`: the full migration file, up and down. `diff`: the application code changes shipping in the same deploy (may be empty).",
-    "keys": ["migration", "diff"]
-  },
-  "questions": {
-    "irreversible": {
-      "type": "noul",
-      "instructions": "Is the `migration` irreversible, meaning there is no down/rollback step that actually undoes what the up step does?",
-      "criteria": {
-        "true": "No down step, a down step that is empty, `pass`, or raises IrreversibleMigration, or a down step that does not undo the up step (for example the up adds an index and the down does nothing about it).",
-        "false": "A down step exists and undoes every change of the up step: drops what was created, re-creates what was dropped, renames back what was renamed. Data lost by a drop does not count as irreversible if the schema is restored."
-      }
+    "description": "Is a database migration reversible, deploy-safe for dropped/renamed columns, and free of large table locks",
+    "state": {
+        "description": "`migration`: the full migration file, up and down. `diff`: the application code changes shipping in the same deploy (may be empty).",
+        "keys": ["migration", "diff"]
     },
-    "drop_in_same_deploy": {
-      "type": "noul",
-      "instructions": "Does the `migration` drop or rename a column while `diff`, shipping in the same deploy, is the change that stops the application from using that column?",
-      "criteria": {
-        "true": "The migration drops or renames a column, and `diff` removes, or switches to the new name, any of the reads/writes, model field, or queries of that same column. Old app instances still running during the deploy would break.",
-        "false": "The migration drops or renames no column; or it drops a column that `diff` does not touch because the app stopped using it in an earlier deploy; or it only adds columns, tables, or indexes."
-      }
+    "questions": {
+        "irreversible": {
+            "type": "noul",
+            "instructions": "Is the `migration` irreversible, meaning there is no down/rollback step that actually undoes what the up step does?",
+            "criteria": {
+                "true": "No down step, a down step that is empty, `pass`, or raises IrreversibleMigration, or a down step that does not undo the up step (for example the up adds an index and the down does nothing about it).",
+                "false": "A down step exists and undoes every change of the up step: drops what was created, re-creates what was dropped, renames back what was renamed. Data lost by a drop does not count as irreversible if the schema is restored."
+            }
+        },
+        "drop_in_same_deploy": {
+            "type": "noul",
+            "instructions": "Does the `migration` drop or rename a column while `diff`, shipping in the same deploy, is the change that stops the application from using that column?",
+            "criteria": {
+                "true": "The migration drops or renames a column, and `diff` removes, or switches to the new name, any of the reads/writes, model field, or queries of that same column. Old app instances still running during the deploy would break.",
+                "false": "The migration drops or renames no column; or it drops a column that `diff` does not touch because the app stopped using it in an earlier deploy; or it only adds columns, tables, or indexes."
+            }
+        },
+        "locks_table": {
+            "type": "noul",
+            "instructions": "Does the up step of `migration` take a long, blocking lock on a table that may be large?",
+            "criteria": {
+                "true": "Creates an index without CONCURRENTLY (or the framework's concurrent option); adds a column with a volatile default such as now(), random(), gen_random_uuid(), or clock_timestamp(); changes a column type forcing a rewrite; adds a NOT NULL or foreign key constraint without NOT VALID then a separate validate; or runs a backfill UPDATE of the whole table inside the migration.",
+                "false": "Creates indexes CONCURRENTLY; adds a nullable column; adds a column with a constant default such as false, 0, or 'pending', even with NOT NULL, because Postgres 11+ stores that without rewriting the table; drops or renames a column; adds a constraint as NOT VALID; or only touches a table the migration itself just created."
+            }
+        }
     },
-    "locks_table": {
-      "type": "noul",
-      "instructions": "Does the up step of `migration` take a long, blocking lock on a table that may be large?",
-      "criteria": {
-        "true": "Creates an index without CONCURRENTLY (or the framework's concurrent option); adds a column with a volatile default such as now(), random(), gen_random_uuid(), or clock_timestamp(); changes a column type forcing a rewrite; adds a NOT NULL or foreign key constraint without NOT VALID then a separate validate; or runs a backfill UPDATE of the whole table inside the migration.",
-        "false": "Creates indexes CONCURRENTLY; adds a nullable column; adds a column with a constant default such as false, 0, or 'pending', even with NOT NULL, because Postgres 11+ stores that without rewriting the table; drops or renames a column; adds a constraint as NOT VALID; or only touches a table the migration itself just created."
-      }
+    "gate": {
+        "rules": [
+            {
+                "verdict": "escalate",
+                "any": [
+                    "irreversible.noul >= 0.6",
+                    "drop_in_same_deploy.noul >= 0.6",
+                    "locks_table.noul >= 0.6"
+                ]
+            },
+            {
+                "verdict": "confirm",
+                "any": [
+                    "irreversible.noul >= 0.5",
+                    "drop_in_same_deploy.noul >= 0.5",
+                    "locks_table.noul >= 0.5"
+                ]
+            }
+        ],
+        "default": "act"
     }
-  },
-  "gate": {
-    "rules": [
-      { "verdict": "escalate", "any": ["irreversible.noul >= 0.6", "drop_in_same_deploy.noul >= 0.6", "locks_table.noul >= 0.6"] },
-      { "verdict": "confirm", "any": ["irreversible.noul >= 0.5", "drop_in_same_deploy.noul >= 0.5", "locks_table.noul >= 0.5"] }
-    ],
-    "default": "act"
-  }
 }
 ```
 
@@ -265,7 +291,7 @@ Jev can't count or do arithmetic, so leave rules like "at most 3 lines" or "unde
 Claude only runs a battery when something tells it to. You have three options, from least to most automatic:
 
 1. **Ask each time:** `/sensibility:judge check this with the migration battery`.
-2. **Add a line to your `CLAUDE.md`:** *"Before you commit a database migration, run the migration battery on it."* Claude then does it at that point on its own. This is enough for most rules.
+2. **Add a line to your `CLAUDE.md`:** _"Before you commit a database migration, run the migration battery on it."_ Claude then does it at that point on its own. This is enough for most rules.
 3. **Write a hook** that calls `judge.py` on every matching event. Only worth it for a check that must never be skipped, since each run adds about 0.5 s.
 
 ### Changing a built-in
@@ -279,14 +305,14 @@ Copy its file from [`batteries/`](batteries/) into `~/.claude/sensibility/batter
 
 This battery asks one pick-one question, "what kind of comment is this?", and passes only the kinds worth keeping. [View the file](examples/batteries/comment.json).
 
-| Comment | Jev's pick | Verdict |
-| --- | --- | --- |
-| `# increment the retry counter` | narration | `escalate` |
-| `# changed from 3 to 5 after the outage last week` | history | `escalate` |
-| `# IMPORTANT: do not remove, this is fine for now` | justification | `escalate` |
-| `# Safari drops Content-Length on 304 replies, so read the size from the cached copy` | outside_constraint | `act` |
-| `# RFC 9110 section 15.4.5: a 304 response has no body` | spec_link | `act` |
-| `// eslint-disable-next-line no-console` | suppression | `act` |
+| Comment                                                                               | Jev's pick         | Verdict    |
+| ------------------------------------------------------------------------------------- | ------------------ | ---------- |
+| `# increment the retry counter`                                                       | narration          | `escalate` |
+| `# changed from 3 to 5 after the outage last week`                                    | history            | `escalate` |
+| `# IMPORTANT: do not remove, this is fine for now`                                    | justification      | `escalate` |
+| `# Safari drops Content-Length on 304 replies, so read the size from the cached copy` | outside_constraint | `act`      |
+| `# RFC 9110 section 15.4.5: a 304 response has no body`                               | spec_link          | `act`      |
+| `// eslint-disable-next-line no-console`                                              | suppression        | `act`      |
 
 </details>
 
@@ -295,11 +321,11 @@ This battery asks one pick-one question, "what kind of comment is this?", and pa
 
 This battery asks three yes/no questions: does it use template headers, does it use buzzwords, does it explain why. [View the file](examples/batteries/pr-description.json).
 
-| PR description | Template headers | Buzzwords | Explains why | Verdict |
-| --- | --- | --- | --- | --- |
-| `## Summary` / "introduces a robust enhancement" / `## Changes` / `## Testing` | 0.98 | 0.95 | 0.05 | `escalate` |
-| "Updated jev.py to check the body of 403 responses. Added a blocked error." | 0.08 | 0.03 | 0.15 | `escalate` |
-| "ok so the judge script treated every HTTP 403 as a missing key. Turns out the firewall also sends a 403 for some shell text…" | 0.04 | 0.03 | 0.89 | `act` |
+| PR description                                                                                                                 | Template headers | Buzzwords | Explains why | Verdict    |
+| ------------------------------------------------------------------------------------------------------------------------------ | ---------------- | --------- | ------------ | ---------- |
+| `## Summary` / "introduces a robust enhancement" / `## Changes` / `## Testing`                                                 | 0.98             | 0.95      | 0.05         | `escalate` |
+| "Updated jev.py to check the body of 403 responses. Added a blocked error."                                                    | 0.08             | 0.03      | 0.15         | `escalate` |
+| "ok so the judge script treated every HTTP 403 as a missing key. Turns out the firewall also sends a 403 for some shell text…" | 0.04             | 0.03      | 0.89         | `act`      |
 
 </details>
 
@@ -308,11 +334,11 @@ This battery asks three yes/no questions: does it use template headers, does it 
 
 Four yes/no questions: names the operation, names the record, leaks a secret, leaks personal data. [View the file](examples/batteries/log-line.json).
 
-| Log call | Operation | Record | Secret | Personal data | Verdict |
-| --- | --- | --- | --- | --- | --- |
-| `charge card failed for order_id=%s` | 0.99 | 0.98 | 0.04 | 0.04 | `act` |
-| `payment failed for {customer.email}` | 0.29 | 0.37 | 0.03 | 0.99 | `escalate` |
-| `something went wrong` | 0.02 | 0.02 | 0.02 | 0.02 | `confirm` |
+| Log call                              | Operation | Record | Secret | Personal data | Verdict    |
+| ------------------------------------- | --------- | ------ | ------ | ------------- | ---------- |
+| `charge card failed for order_id=%s`  | 0.99      | 0.98   | 0.04   | 0.04          | `act`      |
+| `payment failed for {customer.email}` | 0.29      | 0.37   | 0.03   | 0.99          | `escalate` |
+| `something went wrong`                | 0.02      | 0.02   | 0.02   | 0.02          | `confirm`  |
 
 </details>
 
