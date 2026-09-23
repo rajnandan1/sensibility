@@ -53,11 +53,15 @@ Without a key, the judge skill prints these steps and stops. The gates turn them
 
 ## Turn the gates on or off
 
-In Claude Code, run `/plugin configure sensibility@sensibility`. You can also set them when you install:
+From a terminal (this works whether or not the plugin is already installed):
 
 ```sh
-claude plugin install sensibility@sensibility --config stop_gate=true
+claude plugin install sensibility@sensibility --config stop_gate=true    # Finish gate on
+claude plugin install sensibility@sensibility --config stop_gate=false   # Finish gate off
+claude plugin install sensibility@sensibility --config bash_gate=false   # Risk gate off
 ```
+
+Or in Claude Code, run `/plugin configure sensibility@sensibility`, type `true` or `false` in each field, and choose Save configuration.
 
 `stop_gate` controls the Finish gate (default `false`) and `bash_gate` controls the Risk gate (default `true`). Restart Claude Code after you change them.
 
