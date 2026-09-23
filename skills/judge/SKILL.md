@@ -15,13 +15,14 @@ Always exactly this shape, as one Bash command and nothing else on the line:
 ${CLAUDE_PLUGIN_ROOT}/skills/judge/scripts/judge.py '<questions JSON>' --state '<text or JSON>'
 ${CLAUDE_PLUGIN_ROOT}/skills/judge/scripts/judge.py '<questions JSON>' --state-file path/under/cwd.txt
 ${CLAUDE_PLUGIN_ROOT}/skills/judge/scripts/judge.py <battery> --state-file ticket=path/ticket.md --git-diff main...HEAD
+${CLAUDE_PLUGIN_ROOT}/skills/judge/scripts/judge.py <battery> --state '{"ticket":"text from the chat"}' --git-diff HEAD
 ${CLAUDE_PLUGIN_ROOT}/skills/judge/scripts/judge.py --list
 ```
 
 - Wrap JSON in single quotes. To put an apostrophe inside, write `'\''`.
 - Never add `;`, `&&`, `|`, `>`, `<`, `$(...)`, backticks, `$VAR`, env prefixes, `cd`, or heredocs. Those make the command need permission.
 - `--state-file key=path` (repeatable) builds an object state `{key: file text}`. Paths must be under the working directory. For long text not already in a file, write it with the Write tool first.
-- `--git-diff <range>` runs `git diff <range>` itself and adds the output as state key `diff`; combine it with `--state-file key=path`. Never redirect a diff to a file.
+- `--git-diff <range>` runs `git diff <range>` itself and adds the output as state key `diff`. Combine it with `--state-file key=path`, or with `--state '{"ticket":"..."}'` when the other text came from the chat. Never redirect a diff to a file.
 - Do not also `cat` or Read a file you pass with `--state-file`; the script reads it so your context stays clean.
 - Budgets: about 32k tokens of state plus the longest question, 64k in total. Over budget the script refuses; filter the state to what the questions need, never truncate blindly.
 

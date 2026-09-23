@@ -41,9 +41,15 @@ def keyed_files(files):
 
 def read_state(inline, files, rng):
     if rng:
+        base = {}
         if inline is not None:
-            raise jev.JevError("state", "--git-diff combines only with --state-file key=path.", 1)
-        return {**keyed_files(files), "diff": git_diff(rng)}
+            try:
+                base = json.loads(inline)
+            except json.JSONDecodeError:
+                base = None
+            if not isinstance(base, dict):
+                raise jev.JevError("state", "With --git-diff, --state must be a JSON object such as '{\"ticket\":\"...\"}'.", 1)
+        return {**base, **keyed_files(files), "diff": git_diff(rng)}
     if inline is not None and files:
         raise jev.JevError("state", "Use --state or --state-file, not both.", 1)
     if inline is not None:
