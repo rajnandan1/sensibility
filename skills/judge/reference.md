@@ -39,23 +39,4 @@ Identical calls wander by about ±0.04. Do not act on a difference smaller than 
 
 ## Writing a battery
 
-A battery is `<name>.json` in `.claude/sensibility/batteries/` (project) or `~/.claude/sensibility/batteries/` (user). Same name as a built-in shadows it; copy the built-in and edit.
-
-```json
-{
-  "description": "one line shown by --list",
-  "state": { "description": "what each key holds", "keys": ["ticket", "diff"] },
-  "questions": { "<id>": { "type": "noul", "instructions": "...", "criteria": { "true": "...", "false": "..." } } },
-  "gate": {
-    "rules": [
-      { "verdict": "escalate", "any": ["<id>.noul >= 0.7"] },
-      { "verdict": "confirm", "all": ["<id>.noul >= 0.4", "<other>.score >= 2"] }
-    ],
-    "default": "act"
-  }
-}
-```
-
-Conditions are `<id>.<field> <op> <number>` with fields `noul`, `score`, `confidence`, `p.<option>` and ops `>= > <= <`, or `<id>.choice == <option>`. Rules run in order and the first match wins. `--list` validates every battery.
-
-`finish` and `risk` load only from the user or plugin layer, so a cloned repo cannot loosen the hooks.
+The battery skill (`/sensibility:battery`) holds the file format and walks through writing and calibrating one.

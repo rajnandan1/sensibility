@@ -1,0 +1,31 @@
+{
+  "description": "Is a PR description plain and direct, the way a friend would explain it",
+  "state": {
+    "description": "`text`: the PR description.",
+    "keys": ["text"]
+  },
+  "questions": {
+    "ceremony": {
+      "type": "noul",
+      "instructions": "Is `text` built from template sections, such as Summary, Changes, and Testing headers, rather than plain paragraphs?",
+      "criteria": { "true": "It uses section headers or a fill-in template.", "false": "It is plain prose, with at most one short list." }
+    },
+    "buzzwords": {
+      "type": "noul",
+      "instructions": "Does `text` use inflated words that carry no information, such as robust, seamless, leverage, enhance, or streamline?",
+      "criteria": { "true": "At least one such word stands in for a concrete fact.", "false": "Every claim is concrete." }
+    },
+    "explains_why": {
+      "type": "noul",
+      "instructions": "Would someone who never saw the work understand from `text` what was broken or missing, and why this change fixes it?",
+      "criteria": { "true": "The problem and the reason for the fix are both stated.", "false": "It lists changes without the problem behind them." }
+    }
+  },
+  "gate": {
+    "rules": [
+      { "verdict": "escalate", "any": ["explains_why.noul < 0.3"] },
+      { "verdict": "confirm", "any": ["ceremony.noul >= 0.7", "buzzwords.noul >= 0.7", "explains_why.noul < 0.6"] }
+    ],
+    "default": "act"
+  }
+}

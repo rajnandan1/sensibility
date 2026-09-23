@@ -76,7 +76,7 @@ Reading answers: a Noul of 0.5 means "equally likely", not "medium". `confidence
 
 Verdicts: `act` means go ahead; `confirm` means say what looks off and carry on unless it matters; `escalate` means stop and show the user the answers before acting. A verdict is advice from thresholds, not ground truth.
 
-For ranking, test coverage, and anything without a battery, write the questions yourself. More patterns, the full error table, and Jev's other weak spots are in [reference.md](reference.md).
+For ranking, test coverage, and anything without a battery, write the questions yourself. To save a rule as a new battery, use the battery skill. More patterns, the full error table, and Jev's other weak spots are in [reference.md](reference.md).
 
 ## Example: rank candidates
 

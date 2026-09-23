@@ -1,0 +1,32 @@
+{
+  "description": "Does a code comment earn its place, or should it go",
+  "state": {
+    "description": "`comment`: the comment text. `code`: the lines it sits above.",
+    "keys": ["comment", "code"]
+  },
+  "questions": {
+    "kind": {
+      "type": "choice",
+      "instructions": "What kind of comment is `comment`, given the `code` it sits above?",
+      "criteria": {
+        "outside_constraint": "Explains behaviour forced by something outside this codebase: a vendor or library bug, a platform or browser quirk, a protocol.",
+        "spec_link": "Links an issue, RFC, or spec that carries a constraint.",
+        "api_contract": "A doc comment defining a public API's contract.",
+        "suppression": "A lint or type-checker suppression.",
+        "license": "A license or legal header.",
+        "narration": "Restates what the code does.",
+        "history": "Describes past changes, who changed it, or when.",
+        "justification": "Defends the code: important, do not remove, fine for now, too risky.",
+        "todo": "A TODO or FIXME.",
+        "other": "None of the above."
+      }
+    }
+  },
+  "gate": {
+    "rules": [
+      { "verdict": "act", "any": ["kind.choice == outside_constraint", "kind.choice == spec_link", "kind.choice == api_contract", "kind.choice == suppression", "kind.choice == license"] },
+      { "verdict": "confirm", "any": ["kind.choice == other", "kind.confidence < 0.5"] }
+    ],
+    "default": "escalate"
+  }
+}

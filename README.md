@@ -2,9 +2,11 @@
 
 Sensibility lets Claude Code ask [Jev](https://docs.typesafe.ai), TypeSafe's judgment model, short typed questions while it works. Is this true? Which of these fits best? Where does this sit on these levels? Jev answers with probabilities in about half a second, at roughly $0.00005 per question batch. Jev doesn't write text. It only answers the questions it's given.
 
-The plugin has three parts.
+The plugin has four parts.
 
 The judge skill, `/sensibility:judge`, is for Claude to use on its own: ranking options, checking a diff against its ticket, checking a commit message against its diff, or scoring how clearly a PR description reads. It ships with three reusable question sets, called batteries: `scope`, `commit` and `clarity`.
+
+The battery skill, `/sensibility:battery`, turns a rule of yours into a new battery and tests it on examples before saving it. See [Batteries](#batteries).
 
 The Risk gate is off by default. When it's on, it judges every Bash command before it runs. When a command is both risky and destructive, or risky and outside what you asked for, Claude Code stops and asks you:
 
@@ -98,11 +100,42 @@ In testing on 51 real turns, the Finish gate fired 3 times and was right about o
 
 ## Batteries
 
-A battery is a JSON file with a set of questions and, optionally, a gate that turns the answers into `act`, `confirm` or `escalate`. To see every battery Claude can use, ask it to list the Sensibility batteries.
+A battery is a JSON file of questions for Jev, plus an optional gate that turns the answers into `act`, `confirm` or `escalate`. Five come built in (`scope`, `commit`, `clarity`, and the two gates' `finish` and `risk`). Your own go in `~/.claude/sensibility/batteries/` for every project, or `.claude/sensibility/batteries/` for one repo. Claude runs them by name, the same way as the built-ins.
 
-To change a built-in, copy its file from [`batteries/`](batteries/) and edit the copy. A copy in your project's `.claude/sensibility/batteries/` beats one in `~/.claude/sensibility/batteries/`, and both beat the plugin's own. [`skills/judge/reference.md`](skills/judge/reference.md) has the file format.
+The easiest way to make one is to describe the rule and let Claude build it:
 
-The two gate batteries, `risk` and `finish`, load only from `~/.claude/sensibility/batteries/` or the plugin, never from a project. A repo you clone can't loosen your Risk gate.
+```
+/sensibility:battery make a battery called error-message: user-facing errors must say what went wrong and what to do next, and never blame the user
+```
+
+The battery skill picks the question types, writes the file, runs it twice on at least six example cases it writes itself (or ones you give it), and adjusts the wording until every case gets the right verdict. Claude Code asks you once before it writes under `.claude/`.
+
+### Example: comments that earn their place
+
+The rule: a comment stays only if it explains something the code can't, such as a vendor quirk, a spec link or a lint suppression. Narration, history and "do not remove" notes go. That's a keep-list, so the battery asks one question: what kind of comment is this? ([`examples/batteries/comment.json`](examples/batteries/comment.json))
+
+| Comment | Jev's answer | Verdict |
+| --- | --- | --- |
+| `# increment the retry counter` | narration | `escalate` |
+| `# changed from 3 to 5 after the outage last week` | history | `escalate` |
+| `# IMPORTANT: do not remove, this is fine for now` | justification | `escalate` |
+| `# Safari drops Content-Length on 304 replies, so read the size from the cached copy` | outside_constraint | `act` |
+| `# RFC 9110 section 15.4.5: a 304 response has no body` | spec_link | `act` |
+| `// eslint-disable-next-line no-console` | suppression | `act` |
+
+### Example: PR descriptions a newcomer can follow
+
+The rule: plain prose, no template headers, no buzzwords, and it says what was broken and why the change fixes it. That's three independent checks, so the battery asks three yes/no questions. ([`examples/batteries/pr-description.json`](examples/batteries/pr-description.json))
+
+| PR description | Template | Buzzwords | Explains why | Verdict |
+| --- | --- | --- | --- | --- |
+| `## Summary` / "introduces a robust enhancement" / `## Changes` / `## Testing` | 0.98 | 0.95 | 0.05 | `escalate` |
+| "Updated jev.py to check the body of 403 responses. Added a blocked error." | 0.08 | 0.03 | 0.15 | `escalate` |
+| "ok so the judge script treated every HTTP 403 as a missing key. Turns out the firewall also sends a 403 for some shell text…" | 0.04 | 0.03 | 0.89 | `act` |
+
+All the scores above come from real runs. To use either example, copy the file into `~/.claude/sensibility/batteries/`.
+
+The same goes for tuning a built-in: copy its file from [`batteries/`](batteries/) into one of your folders and edit the copy. A project copy wins over a user copy, and both win over the plugin's own. `risk` and `finish` load only from your user folder or the plugin, never from a project, so a repo you clone can't loosen your gates.
 
 ## What leaves your machine, and what gets logged
 
