@@ -105,8 +105,10 @@ A battery is a JSON file of questions for Jev, plus an optional gate that turns 
 The easiest way to make one is to describe the rule and let Claude build it:
 
 ```
-/sensibility:battery make a battery called error-message: user-facing errors must say what went wrong and what to do next, and never blame the user
+/sensibility:battery make a battery called log-line: a log message must name the operation that failed and the record it failed on, and must never include passwords, API keys, or personal data like emails
 ```
+
+In a test run, that prompt produced four yes/no questions (names the operation, names the record, leaks a secret, leaks personal data) and got all 16 test verdicts right. That included `password reset email send failed for user_id=...`, which mentions a password and an email without leaking either. The file is in [`examples/batteries/log-line.json`](examples/batteries/log-line.json).
 
 The battery skill picks the question types, writes the file, runs it twice on at least six example cases it writes itself (or ones you give it), and adjusts the wording until every case gets the right verdict. Claude Code asks you once before it writes under `.claude/`.
 

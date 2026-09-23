@@ -1,0 +1,45 @@
+{
+  "description": "Does a failure log line name the operation and the record, without leaking secrets or personal data",
+  "state": { "description": "`message`: the log line or the logging call that produces it.", "keys": ["message"] },
+  "questions": {
+    "names_operation": {
+      "type": "noul",
+      "instructions": "Does `message` say which operation failed, as a specific action (charge card, send invoice, sync contact, write row to orders)?",
+      "criteria": {
+        "true": "A specific action is named: a verb plus what it acts on, or a clearly named function or job.",
+        "false": "Only a generic phrase like 'error', 'something went wrong', 'failed', 'exception occurred', or 'request failed' with no specific action."
+      }
+    },
+    "names_record": {
+      "type": "noul",
+      "instructions": "Does `message` identify the specific record the failure happened on, by an ID, key, or placeholder that will hold one (order_id=123, user {user_id}, invoice %s)?",
+      "criteria": {
+        "true": "Carries an identifier or a variable placeholder for one, pointing at a single record.",
+        "false": "No identifier at all, only a record type ('an order', 'the user'), or only a count."
+      }
+    },
+    "leaks_secret": {
+      "type": "noul",
+      "instructions": "Does `message` include, or interpolate a variable that holds, a password, API key, access token, secret, private key, or session cookie?",
+      "criteria": {
+        "true": "A credential value or a variable carrying one appears in the output (password=..., token {api_key}, Authorization header, full request headers).",
+        "false": "No credential values. Mentioning the word 'password' or 'token' in prose ('password reset failed', 'token expired') without its value is fine."
+      }
+    },
+    "leaks_pii": {
+      "type": "noul",
+      "instructions": "Does `message` include, or interpolate a variable that holds, personal data: an email address, phone number, full name, street address, date of birth, or government ID?",
+      "criteria": {
+        "true": "Personal data or a variable carrying it appears in the output (user.email, {phone}, 'jane@acme.com', customer name).",
+        "false": "Only opaque identifiers (user_id=42, uuid), or the word 'email' used in prose ('send welcome email failed') without the address."
+      }
+    }
+  },
+  "gate": {
+    "rules": [
+      { "verdict": "escalate", "any": ["leaks_secret.noul >= 0.5", "leaks_pii.noul >= 0.5"] },
+      { "verdict": "confirm", "any": ["names_operation.noul < 0.5", "names_record.noul < 0.5"] }
+    ],
+    "default": "act"
+  }
+}
