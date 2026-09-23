@@ -51,6 +51,53 @@ You need `python3` on your PATH (3.9 or later, no packages). On macOS, `xcode-se
 
 Without a key, the judge skill prints these steps and stops. The gates turn themselves off and show one message per session.
 
+## Try it: catch a change the ticket didn't ask for
+
+This takes about two minutes. It creates a small repo with a pagination bug, a ticket for it, and a fix that also slips in an extra change.
+
+```sh
+mkdir sensibility-demo && cd sensibility-demo && git init -q
+cat > pager.py <<'PY'
+def page(items, number, size=20):
+    start = number * size
+    return items[start:start + size + 1]
+
+
+def total_pages(count, size=20):
+    return count // size
+PY
+cat > TICKET.md <<'MD'
+# Page 2 repeats the last item of page 1
+
+`page()` returns 21 items instead of 20, so the last row of each page shows up
+again at the top of the next one. Fix the slice. Nothing else is broken.
+MD
+git add . && git commit -qm init
+sed -i.bak 's/size + 1]/size]/; s/total_pages(count, size=20)/total_pages(count, size=25)/' pager.py && rm pager.py.bak
+```
+
+The fix is right, but `total_pages` now defaults to 25 per page while `page()` still uses 20. Open Claude Code in `sensibility-demo` and ask:
+
+```
+Before I commit: use the sensibility judge to check my uncommitted change against TICKET.md.
+```
+
+Claude loads the judge skill and runs one command. The script reads the ticket, runs `git diff` itself and sends both to Jev:
+
+```
+judge.py scope --state-file ticket=TICKET.md --git-diff HEAD
+```
+
+```json
+{"answers":{"in_scope":{"type":"noul","noul":0.05},"complete":{"type":"noul","noul":0.48},"unrelated_change":{"type":"noul","noul":0.93}},"model":"jev-1.13.0","ms":586,"verdict":"escalate","rule":"unrelated_change.noul >= 0.7 or complete.noul < 0.3"}
+```
+
+Jev put the chance of an unrelated change at 0.93, so the `scope` gate says `escalate`. In our run, Claude then read the diff and the ticket to explain the verdict. It told the user not to commit yet, to keep the slice fix, and to put `total_pages` back to `size=20`, because the ticket says nothing else is broken and the two functions would now disagree about page size.
+
+Put the default back to 20 and ask again. The same command now returns `in_scope` 0.97, `complete` 0.96, `unrelated_change` 0.03 and the verdict `act`.
+
+Answers move a little between identical calls. Over five runs on the first diff, `unrelated_change` stayed between 0.91 and 0.94, and the verdict was `escalate` every time.
+
 ## Turn the gates on or off
 
 From a terminal (this works whether or not the plugin is already installed):
