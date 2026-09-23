@@ -1,25 +1,47 @@
 # Sensibility
 
-A Claude Code plugin that lets Claude ask [Jev](https://docs.typesafe.ai), TypeSafe's judgment model, for typed answers while it works: yes/no probabilities, pick-one-of, and scores on described levels. Jev answers in about half a second for a fraction of a cent, and never generates text.
+Sensibility lets Claude Code ask [Jev](https://docs.typesafe.ai), TypeSafe's judgment model, short typed questions while it works. Is this true? Which of these fits best? Where does this sit on these levels? Jev answers with probabilities in about half a second, at roughly $0.00005 per question batch. Jev doesn't write text. It only answers the questions it's given.
 
-What you get:
+The plugin has three parts.
 
-- **`/sensibility:judge`**, a skill Claude uses on its own to rank options, check a diff against its ticket, check a commit message, or score how clear a description reads. Built-in batteries: `scope`, `commit`, `clarity`.
-- **Risk gate**, on by default. Every Bash command is judged before it runs. When a command is both risky and destructive, or risky and outside what you asked for, Claude Code asks you first. Everything else runs as normal. Adds about 0.5 s per Bash call.
-- **Finish gate**, off by default. When Claude's final reply stops short of what you asked (offers to do the work instead of doing it, asks permission you already gave, ends on a plan), it gets one nudge to carry on.
+The judge skill, `/sensibility:judge`, is for Claude to use on its own: ranking options, checking a diff against its ticket, checking a commit message against its diff, or scoring how clearly a PR description reads. It ships with three reusable question sets, called batteries: `scope`, `commit` and `clarity`.
 
-Both gates fail open: no key, a network error, or a slow answer never blocks your work.
+The Risk gate is on by default. It judges every Bash command before it runs. When a command is both risky and destructive, or risky and outside what you asked for, Claude Code stops and asks you:
 
-## Requirements
+```
+Sensibility risk gate: risk 1.4/3, deletes or overwrites data, is outside what the user asked
+```
 
-- Claude Code (tested on 2.1.280).
-- `python3` on the PATH (3.9 or later, stdlib only). On macOS: `xcode-select --install`.
-- A TypeSafe API key.
+Everything else runs as usual. Each Bash call takes about 0.5 s longer. Force pushes, `DROP TABLE` and `rm -rf ~` get stopped, and a `git push` you asked for goes through.
+
+The Finish gate is off by default. When it's on and Claude ends a turn short of what you asked (offering to do the work instead of doing it, asking permission you already gave, or stopping at a plan), Claude gets one nudge to keep going.
+
+If there's no key, the network fails or Jev is slow, both gates let the command or reply through. They never block your work.
+
+## Install
+
+In Claude Code:
+
+```
+/plugin marketplace add rajnandan1/sensibility
+/plugin install sensibility@sensibility
+```
+
+Or from a terminal:
+
+```sh
+claude plugin marketplace add rajnandan1/sensibility
+claude plugin install sensibility@sensibility
+```
+
+From a local clone, run `claude plugin marketplace add /path/to/sensibility` and then the same `install` line. To try it for a single session without installing: `claude --plugin-dir /path/to/sensibility`.
+
+You need `python3` on your PATH (3.9 or later, no packages). On macOS, `xcode-select --install` provides it. Tested on Claude Code 2.1.280.
 
 ## Set the key
 
 1. Get a key at https://console.typesafe.ai/keys.
-2. Add it to your shell environment, e.g. in `~/.zshenv`:
+2. Export it in your shell, for example in `~/.zshenv`:
 
    ```sh
    export TYPESAFE_API_KEY=...
@@ -27,66 +49,40 @@ Both gates fail open: no key, a network error, or a slow answer never blocks you
 
 3. Restart Claude Code.
 
-Without the key, the judge skill tells you exactly this and stops, and the gates switch themselves off with one message per session.
-
-## Install
-
-Clone it, then try it for one session:
-
-```sh
-git clone https://github.com/rajnandan1/sensibility ~/Code/sensibility
-claude --plugin-dir ~/Code/sensibility
-```
-
-Load it in every session, with no marketplace, as a skills-directory plugin:
-
-```sh
-ln -s ~/Code/sensibility ~/.claude/skills/sensibility
-```
-
-It then shows up as `sensibility@skills-dir`. To stop loading it, remove the link or run `claude plugin disable sensibility@skills-dir`.
+Without a key, the judge skill prints these steps and stops. The gates turn themselves off and show one message per session.
 
 ## Turn the gates on or off
 
-Both options live in your user settings (`~/.claude/settings.json`), under the plugin's id: `sensibility@skills-dir` for the symlink install, `sensibility@inline` for `--plugin-dir`.
+Set both options in `~/.claude/settings.json`:
 
 ```json
 {
   "pluginConfigs": {
-    "sensibility@skills-dir": {
+    "sensibility@sensibility": {
       "options": { "stop_gate": true, "bash_gate": true }
     }
   }
 }
 ```
 
-`stop_gate` is the Finish gate (default `false`); `bash_gate` is the Risk gate (default `true`). Restart Claude Code after changing them.
+`stop_gate` controls the Finish gate (default `false`) and `bash_gate` controls the Risk gate (default `true`). Restart Claude Code after you change them. With `--plugin-dir`, the key is `sensibility@inline`.
 
-The Finish gate is off because on real sessions it fired about 3 times in 51 turns with about one true hit, and each false hit costs an extra model turn. Turn it on if Claude often ends turns with "want me to…" on work you already asked for.
+The Finish gate ships off because, over 51 real turns, it fired 3 times and was right about once. Each wrong nudge costs an extra model turn. Turn it on if Claude keeps ending with "want me to fix it?" on work you already asked for.
 
 ## Batteries
 
-A battery is a named set of questions with an optional gate. See them all:
+A battery is a JSON file with a set of questions and, optionally, a gate that turns the answers into `act`, `confirm` or `escalate`. To see every battery Claude can use, ask it to list the Sensibility batteries.
 
-```sh
-~/Code/sensibility/skills/judge/scripts/judge.py --list
-```
+To change a built-in, copy its file from [`batteries/`](batteries/) and edit the copy. A copy in your project's `.claude/sensibility/batteries/` beats one in `~/.claude/sensibility/batteries/`, and both beat the plugin's own. [`skills/judge/reference.md`](skills/judge/reference.md) has the file format.
 
-To change a built-in, copy it and edit the copy. A project copy wins over a user copy, which wins over the plugin's:
+The two gate batteries, `risk` and `finish`, load only from `~/.claude/sensibility/batteries/` or the plugin, never from a project. A repo you clone can't loosen your Risk gate.
 
-```sh
-mkdir -p ~/.claude/sensibility/batteries
-cp ~/Code/sensibility/batteries/scope.json ~/.claude/sensibility/batteries/
-```
+## What leaves your machine, and what gets logged
 
-`risk` and `finish` drive the gates, so they load only from `~/.claude/sensibility/batteries/` or the plugin, never from a project. A repo you clone cannot loosen the Risk gate. The file format is in [skills/judge/reference.md](skills/judge/reference.md).
+For each gate judgment, the plugin sends your last prompt plus the command or reply being judged to TypeSafe's API. If your prompts or commands must stay local, turn the gates off.
 
-## What it logs
-
-Every gate judgment is appended to `judgments.jsonl` in the plugin's data directory (`~/.claude/plugins/data/sensibility-skills-dir/` for the symlink install): the state sent, the answers, the verdict, and the latency. That state includes your last prompt and the command or reply judged. Delete the file whenever you like. Judge skill calls are not logged.
-
-Gate states are sent to TypeSafe's API. Turn a gate off if your prompts or commands must not leave the machine.
+Each gate judgment is also appended to `judgments.jsonl` in the plugin's data directory under `~/.claude/plugins/data/`, with the state sent, the answers, the verdict and the latency. You can delete the file at any time. Judge skill calls are not logged.
 
 ## License
 
-MIT, see [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE).

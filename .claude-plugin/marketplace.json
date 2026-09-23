@@ -1,0 +1,17 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "sensibility",
+  "description": "Typed judgments from TypeSafe's Jev while Claude works: a judge skill, a Risk gate on Bash commands, and an opt-in Finish gate.",
+  "owner": {
+    "name": "Raj Nandan Sharma",
+    "url": "https://github.com/rajnandan1"
+  },
+  "plugins": [
+    {
+      "name": "sensibility",
+      "description": "Ask Jev yes/no, pick-one and score questions mid-task; ask before risky shell commands.",
+      "source": "./",
+      "category": "productivity"
+    }
+  ]
+}
