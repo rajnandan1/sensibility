@@ -1,6 +1,6 @@
 {
   "name": "sensibility",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Typed judgments from TypeSafe's Jev during Claude's own work: a judge skill, a Risk gate on Bash commands, and an opt-in Finish gate.",
   "author": {
     "name": "Raj Nandan Sharma",
@@ -11,13 +11,13 @@
       "type": "boolean",
       "title": "Finish gate",
       "description": "Nudge Claude when its final reply stops short of the request.",
-      "default": false
+      "default": true
     },
     "bash_gate": {
       "type": "boolean",
       "title": "Risk gate",
       "description": "Judge every Bash command; ask before risky ones.",
-      "default": true
+      "default": false
     }
   },
   "keywords": [

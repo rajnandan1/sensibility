@@ -46,7 +46,7 @@ def main(event):
     if command.startswith(judge) and is_simple(command):
         hook.emit(decision("allow", "sensibility judge command"))
         return
-    if not hook.enabled("BASH_GATE", "true"):
+    if not hook.enabled("BASH_GATE", "false"):
         return
     state = {"command": command, "cwd": event.get("cwd", ""), "prompt": hook.last_prompt(event.get("transcript_path", ""))}
     judged, warning = hook.judge("risk", state, event, skip=() if state["prompt"] else ("out_of_scope",))

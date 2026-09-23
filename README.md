@@ -6,15 +6,15 @@ The plugin has three parts.
 
 The judge skill, `/sensibility:judge`, is for Claude to use on its own: ranking options, checking a diff against its ticket, checking a commit message against its diff, or scoring how clearly a PR description reads. It ships with three reusable question sets, called batteries: `scope`, `commit` and `clarity`.
 
-The Risk gate is on by default. It judges every Bash command before it runs. When a command is both risky and destructive, or risky and outside what you asked for, Claude Code stops and asks you:
+The Risk gate is off by default. When it's on, it judges every Bash command before it runs. When a command is both risky and destructive, or risky and outside what you asked for, Claude Code stops and asks you:
 
 ```
 Sensibility risk gate: risk 1.4/3, deletes or overwrites data, is outside what the user asked
 ```
 
-Everything else runs as usual. Each Bash call takes about 0.5 s longer. Force pushes, `DROP TABLE` and `rm -rf ~` get stopped, and a `git push` you asked for goes through.
+Everything else runs as usual. With the gate on, each Bash call takes about 0.5 s longer. Force pushes, `DROP TABLE` and `rm -rf ~` get stopped, and a `git push` you asked for goes through.
 
-The Finish gate is off by default. When it's on and Claude ends a turn short of what you asked (offering to do the work instead of doing it, asking permission you already gave, or stopping at a plan), Claude gets one nudge to keep going.
+The Finish gate is on by default. When Claude ends a turn short of what you asked (offering to do the work instead of doing it, asking permission you already gave, or stopping at a plan), Claude gets one nudge to keep going.
 
 If there's no key, the network fails or Jev is slow, both gates let the command or reply through. They never block your work.
 
@@ -56,16 +56,16 @@ Without a key, the judge skill prints these steps and stops. The gates turn them
 From a terminal (this works whether or not the plugin is already installed):
 
 ```sh
-claude plugin install sensibility@sensibility --config stop_gate=true    # Finish gate on
-claude plugin install sensibility@sensibility --config stop_gate=false   # Finish gate off
+claude plugin install sensibility@sensibility --config bash_gate=true    # Risk gate on
 claude plugin install sensibility@sensibility --config bash_gate=false   # Risk gate off
+claude plugin install sensibility@sensibility --config stop_gate=false   # Finish gate off
 ```
 
 Or in Claude Code, run `/plugin configure sensibility@sensibility`, type `true` or `false` in each field, and choose Save configuration.
 
-`stop_gate` controls the Finish gate (default `false`) and `bash_gate` controls the Risk gate (default `true`). Restart Claude Code after you change them.
+`stop_gate` controls the Finish gate (default `true`) and `bash_gate` controls the Risk gate (default `false`). Restart Claude Code after you change them.
 
-The Finish gate ships off because, over 51 real turns, it fired 3 times and was right about once. Each wrong nudge costs an extra model turn. Turn it on if Claude keeps ending with "want me to fix it?" on work you already asked for.
+In testing on 51 real turns, the Finish gate fired 3 times and was right about once. Each wrong nudge costs one extra model turn. Turn it off if the nudges get in your way. Turn the Risk gate on if you want a second check before destructive shell commands.
 
 ## Batteries
 
