@@ -79,7 +79,7 @@ flowchart LR
 | Check a commit message | "Use the sensibility judge to check my last commit message against its diff" | `commit` battery |
 | Rate a PR or issue description | "Use the sensibility judge to score how clear this PR description is: ..." | `clarity` battery |
 | Pick between options | "Use the sensibility judge to pick which of these three approaches best fits the ticket" | questions Claude writes on the spot |
-| Save a rule as a check | "/sensibility:battery make a battery called log-line: a log message must name the operation that failed and the record it failed on, and must never include passwords, API keys, or personal data like emails" | the battery skill |
+| Save a rule as a check | "/sensibility:battery make a battery called migration: a database migration must be reversible and must not lock a large table" | the battery skill |
 | See every battery | "List the sensibility batteries" | `judge.py --list` |
 
 ### Example: catching a change the ticket didn't ask for
@@ -125,104 +125,123 @@ Five batteries come with the plugin:
 
 Your own batteries go in `~/.claude/sensibility/batteries/` (every project) or `.claude/sensibility/batteries/` inside a repo (that repo only).
 
-### Using a battery: a walkthrough
+### Walkthrough: your own battery, start to finish
 
-This walkthrough uses [`log-line.json`](examples/batteries/log-line.json), an example battery in this repo. It checks one rule: *a log message must name the operation that failed and the record it failed on, and must never include passwords, API keys, or personal data like emails.*
+Say your team keeps shipping database migrations that hurt in production: an index build that locks the `orders` table, a column dropped while old app servers still read it. You want Claude to catch these before they merge. Here's how that goes.
 
-**1. Put the battery where Sensibility looks for it.**
-
-```sh
-mkdir -p ~/.claude/sensibility/batteries
-curl -o ~/.claude/sensibility/batteries/log-line.json \
-  https://raw.githubusercontent.com/rajnandan1/sensibility/main/examples/batteries/log-line.json
-```
-
-**2. Ask Claude to use it.** Say which battery and what to check:
+**1. Describe the rule to the battery skill.**
 
 ```
-Check the log lines in billing.py with the log-line battery.
+/sensibility:battery make a battery called migration: a database migration must be reversible, must not drop or rename a column in the same deploy that stops using it, and must not lock a large table (create indexes concurrently, add columns without a volatile default)
 ```
 
-`billing.py` has three log calls:
+**2. Claude builds and tests it.** You don't write any JSON. In our run, the skill:
 
-```python
-log.error("charge card failed for order_id=%s: %s", order.id, err)
-log.error(f"payment failed for {customer.email}")
-log.error("something went wrong")
+- wrote three yes/no questions, one per part of the rule: `irreversible`, `drop_in_same_deploy`, `locks_table`;
+- expected two inputs: `migration` (the migration file) and `diff` (the app code changes shipping with it);
+- made up 9 example migrations (4 safe, 5 unsafe), ran each one twice, and reworded one question after a safe example (`ADD COLUMN ... NOT NULL DEFAULT false`) was wrongly flagged;
+- saved the file once all 9 came out right, and pointed out its weakest case: renamed columns score closest to the cutoff.
+
+The result is [`examples/batteries/migration.json`](examples/batteries/migration.json). Claude Code asks you once before the skill writes into `.claude/`.
+
+**3. Use it on a real change.** Your branch adds three migrations and removes `fax` from the `Customer` model:
+
+```sql
+-- 0042_add_coupon_code.sql
+ALTER TABLE orders ADD COLUMN coupon_code text;
+
+-- 0043_index_orders_created_at.sql
+CREATE INDEX orders_created_at_idx ON orders (created_at);
+
+-- 0044_drop_customer_fax.sql
+ALTER TABLE customers DROP COLUMN fax;
 ```
 
-**3. Claude runs the battery once per log line.** Each run is one command that sends the line to Jev and takes about half a second:
+You ask:
 
 ```
-judge.py log-line --state '{"message":"log.error(f\"payment failed for {customer.email}\")"}'
+Check the new migrations in my uncommitted change with the migration battery.
 ```
 
-**4. Jev answers the four questions, and the battery's rules pick a verdict.** These are the real results:
+Claude runs the battery once per migration. Each run is one command, and the script reads the file and the diff itself:
 
-| Log call | Names the operation | Names the record | Leaks a secret | Leaks personal data | Verdict |
-| --- | --- | --- | --- | --- | --- |
-| `charge card failed for order_id=%s` | 0.99 | 0.98 | 0.04 | 0.04 | `act` |
-| `payment failed for {customer.email}` | 0.29 | 0.37 | 0.03 | 0.99 | `escalate` |
-| `something went wrong` | 0.02 | 0.02 | 0.02 | 0.02 | `confirm` |
+```
+judge.py migration --state-file migration=migrations/0044_drop_customer_fax.sql --git-diff HEAD
+```
 
-**5. Claude reports back.** In the real run it said two of the three lines needed fixing. The email line puts a customer's address in the logs and should log `customer_id` instead. "something went wrong" says neither which operation failed nor on which record. The first line is fine. It didn't edit the file until asked.
+**4. Read the results.** These are the real answers:
+
+| Migration | Irreversible | Drops a column still in use | Locks the table | Verdict |
+| --- | --- | --- | --- | --- |
+| `0042_add_coupon_code` | 0.04 | 0.05 | 0.09 | `act` |
+| `0043_index_orders_created_at` | 0.03 | 0.06 | 0.72 | `escalate` |
+| `0044_drop_customer_fax` | 0.06 | 0.74 | 0.23 | `escalate` |
+
+Claude then checked both flagged files itself and said:
+
+- **0043:** a plain `CREATE INDEX` blocks writes to `orders` until the index is built. Use `CREATE INDEX CONCURRENTLY`, outside a transaction.
+- **0044:** `app/models.py` removes `Customer.fax` in the same deploy that drops the column, so old app servers still running during the rollout will hit a missing column. Ship the model change now and move 0044 to the next deploy.
+- **0042** is fine.
+
+**5. Make it automatic.** Add one line to your project's `CLAUDE.md`:
+
+```
+Before you commit a database migration, run the migration battery on it.
+```
+
+From then on, Claude checks every migration it writes without being asked.
 
 ### What's inside a battery
 
-Every battery has the same four parts. Here they are for `log-line.json`:
+Every battery has the same four parts. Here they are for `migration.json`:
 
-| Part | In `log-line.json` | What it's for |
+| Part | In `migration.json` | What it's for |
 | --- | --- | --- |
-| `description` | "Does a failure log line name the operation and the record, without leaking secrets or personal data" | One line shown when you list batteries. |
-| `state` | one key, `message` | What text the battery expects. Here, `message` holds the log line. `scope` expects two keys, `ticket` and `diff`. |
-| `questions` | four yes/no questions: `names_operation`, `names_record`, `leaks_secret`, `leaks_pii` | What Jev is asked. Each one spells out what counts as yes and what counts as no, including the tricky cases: the word "password" in `password reset failed` is not a leak. |
-| `gate` | leak score of 0.5 or more: `escalate`. Otherwise, a missing operation or record: `confirm`. Otherwise: `act`. | Turns the four scores into one verdict. Rules are checked in order and the first match wins. |
+| `description` | "Is a database migration reversible, deploy-safe for dropped/renamed columns, and free of large table locks" | One line shown when you list batteries. |
+| `state` | two keys: `migration` and `diff` | What text the battery expects. A key named `diff` can be filled straight from git with `--git-diff`. |
+| `questions` | three yes/no questions: `irreversible`, `drop_in_same_deploy`, `locks_table` | What Jev is asked. Each one spells out what counts as yes and what counts as no, including the tricky cases: a constant default like `false` doesn't lock the table, `now()` does. |
+| `gate` | any score of 0.6 or more: `escalate`. Any of 0.5 or more: `confirm`. Otherwise: `act`. | Turns the scores into one verdict. Rules are checked in order and the first match wins. |
 
 <details>
-<summary>Show the full <code>log-line.json</code></summary>
+<summary>Show the full <code>migration.json</code></summary>
 
 ```json
 {
-  "description": "Does a failure log line name the operation and the record, without leaking secrets or personal data",
-  "state": { "description": "`message`: the log line or the logging call that produces it.", "keys": ["message"] },
+  "description": "Is a database migration reversible, deploy-safe for dropped/renamed columns, and free of large table locks",
+  "state": {
+    "description": "`migration`: the full migration file, up and down. `diff`: the application code changes shipping in the same deploy (may be empty).",
+    "keys": ["migration", "diff"]
+  },
   "questions": {
-    "names_operation": {
+    "irreversible": {
       "type": "noul",
-      "instructions": "Does `message` say which operation failed, as a specific action (charge card, send invoice, sync contact, write row to orders)?",
+      "instructions": "Is the `migration` irreversible, meaning there is no down/rollback step that actually undoes what the up step does?",
       "criteria": {
-        "true": "A specific action is named: a verb plus what it acts on, or a clearly named function or job.",
-        "false": "Only a generic phrase like 'error', 'something went wrong', 'failed', 'exception occurred', or 'request failed' with no specific action."
+        "true": "No down step, a down step that is empty, `pass`, or raises IrreversibleMigration, or a down step that does not undo the up step (for example the up adds an index and the down does nothing about it).",
+        "false": "A down step exists and undoes every change of the up step: drops what was created, re-creates what was dropped, renames back what was renamed. Data lost by a drop does not count as irreversible if the schema is restored."
       }
     },
-    "names_record": {
+    "drop_in_same_deploy": {
       "type": "noul",
-      "instructions": "Does `message` identify the specific record the failure happened on, by an ID, key, or placeholder that will hold one (order_id=123, user {user_id}, invoice %s)?",
+      "instructions": "Does the `migration` drop or rename a column while `diff`, shipping in the same deploy, is the change that stops the application from using that column?",
       "criteria": {
-        "true": "Carries an identifier or a variable placeholder for one, pointing at a single record.",
-        "false": "No identifier at all, only a record type ('an order', 'the user'), or only a count."
+        "true": "The migration drops or renames a column, and `diff` removes, or switches to the new name, any of the reads/writes, model field, or queries of that same column. Old app instances still running during the deploy would break.",
+        "false": "The migration drops or renames no column; or it drops a column that `diff` does not touch because the app stopped using it in an earlier deploy; or it only adds columns, tables, or indexes."
       }
     },
-    "leaks_secret": {
+    "locks_table": {
       "type": "noul",
-      "instructions": "Does `message` include, or interpolate a variable that holds, a password, API key, access token, secret, private key, or session cookie?",
+      "instructions": "Does the up step of `migration` take a long, blocking lock on a table that may be large?",
       "criteria": {
-        "true": "A credential value or a variable carrying one appears in the output (password=..., token {api_key}, Authorization header, full request headers).",
-        "false": "No credential values. Mentioning the word 'password' or 'token' in prose ('password reset failed', 'token expired') without its value is fine."
-      }
-    },
-    "leaks_pii": {
-      "type": "noul",
-      "instructions": "Does `message` include, or interpolate a variable that holds, personal data: an email address, phone number, full name, street address, date of birth, or government ID?",
-      "criteria": {
-        "true": "Personal data or a variable carrying it appears in the output (user.email, {phone}, 'jane@acme.com', customer name).",
-        "false": "Only opaque identifiers (user_id=42, uuid), or the word 'email' used in prose ('send welcome email failed') without the address."
+        "true": "Creates an index without CONCURRENTLY (or the framework's concurrent option); adds a column with a volatile default such as now(), random(), gen_random_uuid(), or clock_timestamp(); changes a column type forcing a rewrite; adds a NOT NULL or foreign key constraint without NOT VALID then a separate validate; or runs a backfill UPDATE of the whole table inside the migration.",
+        "false": "Creates indexes CONCURRENTLY; adds a nullable column; adds a column with a constant default such as false, 0, or 'pending', even with NOT NULL, because Postgres 11+ stores that without rewriting the table; drops or renames a column; adds a constraint as NOT VALID; or only touches a table the migration itself just created."
       }
     }
   },
   "gate": {
     "rules": [
-      { "verdict": "escalate", "any": ["leaks_secret.noul >= 0.5", "leaks_pii.noul >= 0.5"] },
-      { "verdict": "confirm", "any": ["names_operation.noul < 0.5", "names_record.noul < 0.5"] }
+      { "verdict": "escalate", "any": ["irreversible.noul >= 0.6", "drop_in_same_deploy.noul >= 0.6", "locks_table.noul >= 0.6"] },
+      { "verdict": "confirm", "any": ["irreversible.noul >= 0.5", "drop_in_same_deploy.noul >= 0.5", "locks_table.noul >= 0.5"] }
     ],
     "default": "act"
   }
@@ -233,24 +252,18 @@ Every battery has the same four parts. Here they are for `log-line.json`:
 
 ### Making your own
 
-You don't have to write the JSON. Describe the rule to the battery skill, and it builds the file for you:
+The walkthrough above is the whole process: describe the rule after `/sensibility:battery`, give it a name, and say whether it's for this repo or all your projects. The skill tests the battery on examples before it saves it. If you have real examples of good and bad cases, paste them in; the skill tests against those instead of making up its own.
 
-```
-/sensibility:battery make a battery called log-line: a log message must name the operation that failed and the record it failed on, and must never include passwords, API keys, or personal data like emails
-```
+To change a battery later, edit its JSON or ask Claude ("make the migration battery also flag `ALTER COLUMN ... TYPE`"). The skill retests it the same way.
 
-The skill picks the question types, writes the file, then tests it. It makes up at least six example inputs (or uses yours), each with the verdict it should get, and runs every one twice. When an example gets the wrong verdict, it rewrites the questions and tests again. It finishes when every example comes out right, and shows you the results. Claude Code asks you once before it writes into `.claude/`.
-
-`log-line.json` in this repo came out of exactly that prompt. The skill tested it on 8 lines, twice each, and all 16 runs gave the expected verdict. One test was `password reset email send failed for user_id=...`, which mentions a password and an email without leaking either; it passed.
-
-To tune a battery later, edit its JSON or ask Claude to ("make log-line also flag phone numbers"). The battery skill retests it the same way.
+Jev can't count or do arithmetic, so leave rules like "at most 3 lines" or "under 72 characters" to code or to Claude.
 
 ### Making a battery run without asking
 
 Claude only runs a battery when something tells it to. You have three options, from least to most automatic:
 
-1. **Ask each time:** "check this with `log-line`".
-2. **Add a line to your `CLAUDE.md`:** *"Before you commit, run the `log-line` battery on any log calls you added."* Claude then does it at that point on its own. This is enough for most rules.
+1. **Ask each time:** "check this with the `migration` battery".
+2. **Add a line to your `CLAUDE.md`:** *"Before you commit a database migration, run the migration battery on it."* Claude then does it at that point on its own. This is enough for most rules.
 3. **Write a hook** that calls `judge.py` on every matching event. Only worth it for a check that must never be skipped, since each run adds about 0.5 s.
 
 ### Changing a built-in
@@ -285,6 +298,19 @@ This battery asks three yes/no questions: does it use template headers, does it 
 | `## Summary` / "introduces a robust enhancement" / `## Changes` / `## Testing` | 0.98 | 0.95 | 0.05 | `escalate` |
 | "Updated jev.py to check the body of 403 responses. Added a blocked error." | 0.08 | 0.03 | 0.15 | `escalate` |
 | "ok so the judge script treated every HTTP 403 as a missing key. Turns out the firewall also sends a 403 for some shell text…" | 0.04 | 0.03 | 0.89 | `act` |
+
+</details>
+
+<details>
+<summary><code>log-line.json</code>: a failure log must name the operation and the record, and never leak secrets or personal data</summary>
+
+Four yes/no questions: names the operation, names the record, leaks a secret, leaks personal data. [View the file](examples/batteries/log-line.json).
+
+| Log call | Operation | Record | Secret | Personal data | Verdict |
+| --- | --- | --- | --- | --- | --- |
+| `charge card failed for order_id=%s` | 0.99 | 0.98 | 0.04 | 0.04 | `act` |
+| `payment failed for {customer.email}` | 0.29 | 0.37 | 0.03 | 0.99 | `escalate` |
+| `something went wrong` | 0.02 | 0.02 | 0.02 | 0.02 | `confirm` |
 
 </details>
 

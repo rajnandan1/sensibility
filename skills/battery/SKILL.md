@@ -59,7 +59,7 @@ Independent judge calls can go out in parallel in one message.
 Collect from the user, or from the file or doc they point at:
 
 - **The rule** in their own words.
-- **The state**: what text gets judged, split into named keys (`comment` and `code`, `message` and `diff`). Each key becomes a `state.keys` entry.
+- **The state**: what text gets judged, split into named keys (`comment` and `code`, `message` and `diff`). Each key becomes a `state.keys` entry. When one input is a git diff, name that key `diff`: `--git-diff` fills exactly that key, so the battery runs as `--git-diff HEAD` with no copying.
 - **Labelled examples**: at least 3 that should pass and 3 that should fail, drawn from real code or text where possible, each with the verdict it should get. When the user gives none, write them yourself from the rule and show them in the report.
 - **Where it lives**: `~/.claude/sensibility/batteries/` for every project (the default), or `.claude/sensibility/batteries/` for this repo only.
 - **A name**: short kebab-case. `finish` and `risk` load only from the user folder; reusing a built-in name replaces it at that layer.
@@ -84,7 +84,7 @@ Run the battery on every labelled example, twice each, and tabulate expected ver
 
 When an example lands wrong, fix the wording first: sharpen `instructions` or `criteria`, or switch to a Choice. Move a threshold only after the wording is right, and place it in the gap between the pass and fail answers you observed, at least 0.05 from any of them (Jev wanders about ±0.04 between identical calls).
 
-Done when every labelled example gets its expected verdict on both runs.
+Done when every labelled example gets its expected verdict on two fresh runs of the final file. Reusing answers from before an edit does not count.
 
 ## 4. Report
 
