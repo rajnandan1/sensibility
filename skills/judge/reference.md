@@ -39,4 +39,39 @@ Identical calls wander by about ±0.04. Do not act on a difference smaller than 
 
 ## Writing a battery
 
-The battery skill (`/sensibility:battery`) holds the file format and walks through writing and calibrating one.
+A battery is `<name>.json` in `.claude/sensibility/batteries/` (this repo), `~/.claude/sensibility/batteries/` (every project), or the plugin's `batteries/`, searched in that order. A file named after a built-in replaces it at that layer. `finish` and `risk` load only from the user folder or the plugin.
+
+```json
+{
+  "description": "One line shown by --list",
+  "state": { "description": "`comment`: the comment text. `code`: the lines it sits above.", "keys": ["comment", "code"] },
+  "questions": {
+    "kind": {
+      "type": "choice",
+      "instructions": "What kind of comment is `comment`, given the `code` it sits above?",
+      "criteria": {
+        "outside_constraint": "Explains behaviour forced by something outside this codebase: a vendor bug, a platform quirk, a protocol.",
+        "spec_link": "Links an issue, RFC, or spec that carries a constraint.",
+        "narration": "Restates what the code does.",
+        "history": "Describes past changes, who changed it, or when.",
+        "other": "None of the above."
+      }
+    }
+  },
+  "gate": {
+    "rules": [
+      { "verdict": "act", "any": ["kind.choice == outside_constraint", "kind.choice == spec_link"] },
+      { "verdict": "confirm", "any": ["kind.choice == other", "kind.confidence < 0.5"] }
+    ],
+    "default": "escalate"
+  }
+}
+```
+
+- `state.keys` are the names the state object must carry. Name a git diff `diff` so `--git-diff` fills it.
+- `questions` go to Jev unchanged, the same three types as in SKILL.md.
+- `gate` is optional. Rules run in order, first match wins, else `default`. A rule is `{"verdict": "act" | "confirm" | "escalate", "any" | "all": [conditions]}`. A condition is `<id>.<field> <op> <number>` with fields `noul`, `score`, `confidence`, `p.<option>` and ops `>= > <= <`, or `<id>.choice == <option>`. No weights, no arithmetic; OR across rules is two rules.
+
+Shapes that work: a keep-list rule ("only these kinds are allowed") is one Choice over the kinds plus `other`, with a gate that acts on the allowed ones and escalates by default. Independent hazards ("no X, no Y, must have Z") are one Noul each, with `true` and `false` criteria that name the boundary cases. Quality is one Score with 3 to 5 concrete levels and usually no gate.
+
+Write the file with the Write tool. Before calling it done, run it on at least 3 examples that should pass and 3 that should fail, twice each. Fix wording before moving a threshold, and keep each threshold at least 0.05 from any answer you observed. `judge.py --list` must show the file with no `INVALID` line.

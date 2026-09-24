@@ -29,10 +29,10 @@ Use the sensibility judge to check my uncommitted change against this ticket: <p
 
 Claude runs one command and reports a verdict (`act`, `confirm` or `escalate`) with the numbers behind it. If something is off, it tells you what.
 
-**5. Save a check you want to reuse.** A battery is that check: a few questions, saved under a name, so you can run the same one again. You describe the rule. Claude writes the file and tries it on examples before saving.
+**5. Save a check you want to reuse.** A battery is that check: a few questions in a JSON file, run again by name. You describe the rule. Claude writes the file and tries it on examples before saving.
 
 ```
-/sensibility:battery make a battery called comment: keep a code comment only if it explains something the code itself can't
+Use the sensibility judge to save a battery called comment: keep a code comment only if it explains something the code itself can't
 ```
 
 **6. Use that check.** Next time, ask the judge to run it by name:
@@ -81,7 +81,7 @@ flowchart LR
 | Finish gate | Claude ends a turn        | If Claude stopped short (offered to do the work instead of doing it, asked permission you already gave, ended on a plan), Claude gets one nudge to keep going. | **on**  |
 | Risk gate   | Before every Bash command | If a command is risky and destructive, or risky and outside what you asked for, Claude Code stops and asks you first.                                          | **off** |
 
-**The battery skill** (`/sensibility:battery`) turns a rule of yours into a new battery and tests it before saving. See [Batteries](#batteries).
+To save a check of your own as a battery, see [Batteries](#batteries).
 
 ## Things to ask Claude
 
@@ -91,7 +91,7 @@ flowchart LR
 | Check a commit message            | "Use the sensibility judge to check my last commit message against its diff"                                                    | `commit` battery                    |
 | Rate a PR or issue description    | "Use the sensibility judge to score how clear this PR description is: ..."                                                      | `clarity` battery                   |
 | Pick between options              | "Use the sensibility judge to pick which of these three approaches best fits the ticket"                                        | questions Claude writes on the spot |
-| Save a rule as a check            | "/sensibility:battery make a battery called migration: a database migration must be reversible and must not lock a large table" | the battery skill                   |
+| Save a rule as a check            | "Use the sensibility judge to save a battery called migration: a database migration must be reversible and must not lock a large table" | Claude writes the JSON, then `judge.py migration` |
 | See every battery                 | "List the sensibility batteries"                                                                                                | `judge.py --list`                   |
 
 ### Example: catching a change the ticket didn't ask for
@@ -123,7 +123,7 @@ The script read the ticket and ran `git diff` itself, so Claude got the verdict 
 
 ## Batteries
 
-A battery is a check you can reuse. It's a small JSON file that holds a few questions for Jev and the rules that turn Jev's answers into a verdict. You write it once, give it a name, and from then on you (or Claude) can run it by that name on any text.
+A battery is a check you can reuse: a small JSON file holding a few questions for Jev and the rules that turn the answers into a verdict. It has a name, and you or Claude run it by that name on any text. The wording is pinned, so the same input gets the same verdict every time. Questions written on the spot don't give you that: one diff and its ticket got `act`, `confirm` and `escalate` from three reasonable phrasings of the same three questions.
 
 Five batteries come with the plugin:
 
@@ -135,175 +135,65 @@ Five batteries come with the plugin:
 | `risk`    | how irreversible and far-reaching a shell command is                  | Risk gate   |
 | `finish`  | whether Claude's last reply stops short of what you asked             | Finish gate |
 
-Your own batteries go in `~/.claude/sensibility/batteries/` (every project) or `.claude/sensibility/batteries/` inside a repo (that repo only).
+Your own go in `~/.claude/sensibility/batteries/` (every project) or `.claude/sensibility/batteries/` inside a repo (that repo only). To change a built-in, copy its file from [`batteries/`](batteries/) into one of those folders and edit the copy. The two gate batteries, `risk` and `finish`, only load from your user folder or the plugin, so a repo you clone can't change how your gates behave.
 
-### Walkthrough: your own battery, start to finish
+### Example: keep a code comment only if it explains something the code can't
 
-Say your team keeps shipping database migrations that hurt in production: an index build that locks the `orders` table, a column dropped while old app servers still read it. You want Claude to catch these before they merge. Here's how that goes.
-
-**1. Describe the rule to the battery skill.**
+Ask Claude for it:
 
 ```
-/sensibility:battery make a battery called migration: a database migration must be reversible, must not drop or rename a column in the same deploy that stops using it, and must not lock a large table (create indexes concurrently, add columns without a volatile default)
+Use the sensibility judge to save a battery called comment: keep a code comment only if it explains something the code itself can't
 ```
 
-**2. Claude builds and tests it.** You don't write any JSON. In our run, the skill:
-
-- wrote three yes/no questions, one per part of the rule: `irreversible`, `drop_in_same_deploy`, `locks_table`;
-- expected two inputs: `migration` (the migration file) and `diff` (the app code changes shipping with it);
-- made up 9 example migrations (4 safe, 5 unsafe), ran each one twice, and reworded one question after a safe example (`ADD COLUMN ... NOT NULL DEFAULT false`) was wrongly flagged;
-- saved the file once all 9 came out right, and pointed out its weakest case: renamed columns score closest to the cutoff.
-
-The result is [`examples/batteries/migration.json`](examples/batteries/migration.json). Claude Code asks you once before the skill writes into `.claude/`.
-
-**3. Use it on a real change.** Your branch adds three migrations and removes `fax` from the `Customer` model:
-
-```sql
--- 0042_add_coupon_code.sql
-ALTER TABLE orders ADD COLUMN coupon_code text;
-
--- 0043_index_orders_created_at.sql
-CREATE INDEX orders_created_at_idx ON orders (created_at);
-
--- 0044_drop_customer_fax.sql
-ALTER TABLE customers DROP COLUMN fax;
-```
-
-You ask:
-
-```
-/sensibility:judge check the new migrations in my uncommitted change with the migration battery
-```
-
-Batteries always run through the judge skill. Typing `/sensibility:judge` is the sure way to start it. Plain wording like "check my migrations with the migration battery" works too, since Claude loads the judge skill by itself when you mention a battery; it did in every test run.
-
-Claude runs the battery once per migration. Each run is one command, and the script reads the file and the diff itself:
-
-```
-judge.py migration --state-file migration=migrations/0044_drop_customer_fax.sql --git-diff HEAD
-```
-
-**4. Read the results.** These are the real answers:
-
-| Migration                      | Irreversible | Drops a column still in use | Locks the table | Verdict    |
-| ------------------------------ | ------------ | --------------------------- | --------------- | ---------- |
-| `0042_add_coupon_code`         | 0.04         | 0.05                        | 0.09            | `act`      |
-| `0043_index_orders_created_at` | 0.03         | 0.06                        | 0.72            | `escalate` |
-| `0044_drop_customer_fax`       | 0.06         | 0.74                        | 0.23            | `escalate` |
-
-Claude then checked both flagged files itself and said:
-
-- **0043:** a plain `CREATE INDEX` blocks writes to `orders` until the index is built. Use `CREATE INDEX CONCURRENTLY`, outside a transaction.
-- **0044:** `app/models.py` removes `Customer.fax` in the same deploy that drops the column, so old app servers still running during the rollout will hit a missing column. Ship the model change now and move 0044 to the next deploy.
-- **0042** is fine.
-
-**5. Make it automatic.** Add one line to your project's `CLAUDE.md`:
-
-```
-Before you commit a database migration, run the migration battery on it.
-```
-
-From then on, Claude checks every migration it writes without being asked.
-
-### What's inside a battery
-
-Every battery has the same four parts. Here they are for `migration.json`:
-
-| Part          | In `migration.json`                                                                                          | What it's for                                                                                                                                                                      |
-| ------------- | ------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `description` | "Is a database migration reversible, deploy-safe for dropped/renamed columns, and free of large table locks" | One line shown when you list batteries.                                                                                                                                            |
-| `state`       | two keys: `migration` and `diff`                                                                             | What text the battery expects. A key named `diff` can be filled straight from git with `--git-diff`.                                                                               |
-| `questions`   | three yes/no questions: `irreversible`, `drop_in_same_deploy`, `locks_table`                                 | What Jev is asked. Each one spells out what counts as yes and what counts as no, including the tricky cases: a constant default like `false` doesn't lock the table, `now()` does. |
-| `gate`        | any score of 0.6 or more: `escalate`. Any of 0.5 or more: `confirm`. Otherwise: `act`.                       | Turns the scores into one verdict. Rules are checked in order and the first match wins.                                                                                            |
+Claude writes the file, tries it on a few comments that should pass and a few that should fail, and saves it once they all come out right. This is what it wrote: one pick-one question, "what kind of comment is this?", and a gate that passes only the kinds worth keeping.
 
 <details>
-<summary>Show the full <code>migration.json</code></summary>
+<summary>Show <code>comment.json</code></summary>
 
 ```json
 {
-    "description": "Is a database migration reversible, deploy-safe for dropped/renamed columns, and free of large table locks",
-    "state": {
-        "description": "`migration`: the full migration file, up and down. `diff`: the application code changes shipping in the same deploy (may be empty).",
-        "keys": ["migration", "diff"]
-    },
-    "questions": {
-        "irreversible": {
-            "type": "noul",
-            "instructions": "Is the `migration` irreversible, meaning there is no down/rollback step that actually undoes what the up step does?",
-            "criteria": {
-                "true": "No down step, a down step that is empty, `pass`, or raises IrreversibleMigration, or a down step that does not undo the up step (for example the up adds an index and the down does nothing about it).",
-                "false": "A down step exists and undoes every change of the up step: drops what was created, re-creates what was dropped, renames back what was renamed. Data lost by a drop does not count as irreversible if the schema is restored."
-            }
-        },
-        "drop_in_same_deploy": {
-            "type": "noul",
-            "instructions": "Does the `migration` drop or rename a column while `diff`, shipping in the same deploy, is the change that stops the application from using that column?",
-            "criteria": {
-                "true": "The migration drops or renames a column, and `diff` removes, or switches to the new name, any of the reads/writes, model field, or queries of that same column. Old app instances still running during the deploy would break.",
-                "false": "The migration drops or renames no column; or it drops a column that `diff` does not touch because the app stopped using it in an earlier deploy; or it only adds columns, tables, or indexes."
-            }
-        },
-        "locks_table": {
-            "type": "noul",
-            "instructions": "Does the up step of `migration` take a long, blocking lock on a table that may be large?",
-            "criteria": {
-                "true": "Creates an index without CONCURRENTLY (or the framework's concurrent option); adds a column with a volatile default such as now(), random(), gen_random_uuid(), or clock_timestamp(); changes a column type forcing a rewrite; adds a NOT NULL or foreign key constraint without NOT VALID then a separate validate; or runs a backfill UPDATE of the whole table inside the migration.",
-                "false": "Creates indexes CONCURRENTLY; adds a nullable column; adds a column with a constant default such as false, 0, or 'pending', even with NOT NULL, because Postgres 11+ stores that without rewriting the table; drops or renames a column; adds a constraint as NOT VALID; or only touches a table the migration itself just created."
-            }
-        }
-    },
-    "gate": {
-        "rules": [
-            {
-                "verdict": "escalate",
-                "any": [
-                    "irreversible.noul >= 0.6",
-                    "drop_in_same_deploy.noul >= 0.6",
-                    "locks_table.noul >= 0.6"
-                ]
-            },
-            {
-                "verdict": "confirm",
-                "any": [
-                    "irreversible.noul >= 0.5",
-                    "drop_in_same_deploy.noul >= 0.5",
-                    "locks_table.noul >= 0.5"
-                ]
-            }
-        ],
-        "default": "act"
+  "description": "Does a code comment earn its place, or should it go",
+  "state": {
+    "description": "`comment`: the comment text. `code`: the lines it sits above.",
+    "keys": ["comment", "code"]
+  },
+  "questions": {
+    "kind": {
+      "type": "choice",
+      "instructions": "What kind of comment is `comment`, given the `code` it sits above?",
+      "criteria": {
+        "outside_constraint": "Explains behaviour forced by something outside this codebase: a vendor or library bug, a platform or browser quirk, a protocol.",
+        "spec_link": "Links an issue, RFC, or spec that carries a constraint.",
+        "api_contract": "A doc comment defining a public API's contract.",
+        "suppression": "A lint or type-checker suppression.",
+        "license": "A license or legal header.",
+        "narration": "Restates what the code does.",
+        "history": "Describes past changes, who changed it, or when.",
+        "justification": "Defends the code: important, do not remove, fine for now, too risky.",
+        "todo": "A TODO or FIXME.",
+        "other": "None of the above."
+      }
     }
+  },
+  "gate": {
+    "rules": [
+      { "verdict": "act", "any": ["kind.choice == outside_constraint", "kind.choice == spec_link", "kind.choice == api_contract", "kind.choice == suppression", "kind.choice == license"] },
+      { "verdict": "confirm", "any": ["kind.choice == other", "kind.confidence < 0.5"] }
+    ],
+    "default": "escalate"
+  }
 }
 ```
 
 </details>
 
-### Making your own
+Run it by name:
 
-The walkthrough above is the whole process: describe the rule after `/sensibility:battery`, give it a name, and say whether it's for this repo or all your projects. The skill tests the battery on examples before it saves it. If you have real examples of good and bad cases, paste them in; the skill tests against those instead of making up its own.
+```
+/sensibility:judge check this comment with the comment battery: # increment the retry counter
+```
 
-To change a battery later, edit its JSON or ask Claude ("make the migration battery also flag `ALTER COLUMN ... TYPE`"). The skill retests it the same way.
-
-Jev can't count or do arithmetic, so leave rules like "at most 3 lines" or "under 72 characters" to code or to Claude.
-
-### Making a battery run without asking
-
-Claude only runs a battery when something tells it to. You have three options, from least to most automatic:
-
-1. **Ask each time:** `/sensibility:judge check this with the migration battery`.
-2. **Add a line to your `CLAUDE.md`:** _"Before you commit a database migration, run the migration battery on it."_ Claude then does it at that point on its own. This is enough for most rules.
-3. **Write a hook** that calls `judge.py` on every matching event. Only worth it for a check that must never be skipped, since each run adds about 0.5 s.
-
-### Changing a built-in
-
-Copy its file from [`batteries/`](batteries/) into `~/.claude/sensibility/batteries/` and edit the copy. A copy in a project folder wins over your user copy, and both win over the plugin's own. The two gate batteries, `risk` and `finish`, only load from your user folder or the plugin, so a repo you clone can't change how your gates behave.
-
-### More example batteries
-
-<details>
-<summary><code>comment.json</code>: keep a code comment only if it explains something the code can't</summary>
-
-This battery asks one pick-one question, "what kind of comment is this?", and passes only the kinds worth keeping. [View the file](examples/batteries/comment.json).
+Real answers:
 
 | Comment                                                                               | Jev's pick         | Verdict    |
 | ------------------------------------------------------------------------------------- | ------------------ | ---------- |
@@ -314,35 +204,7 @@ This battery asks one pick-one question, "what kind of comment is this?", and pa
 | `# RFC 9110 section 15.4.5: a 304 response has no body`                               | spec_link          | `act`      |
 | `// eslint-disable-next-line no-console`                                              | suppression        | `act`      |
 
-</details>
-
-<details>
-<summary><code>pr-description.json</code>: plain prose that says what was broken and why the change fixes it</summary>
-
-This battery asks three yes/no questions: does it use template headers, does it use buzzwords, does it explain why. [View the file](examples/batteries/pr-description.json).
-
-| PR description                                                                                                                 | Template headers | Buzzwords | Explains why | Verdict    |
-| ------------------------------------------------------------------------------------------------------------------------------ | ---------------- | --------- | ------------ | ---------- |
-| `## Summary` / "introduces a robust enhancement" / `## Changes` / `## Testing`                                                 | 0.98             | 0.95      | 0.05         | `escalate` |
-| "Updated jev.py to check the body of 403 responses. Added a blocked error."                                                    | 0.08             | 0.03      | 0.15         | `escalate` |
-| "ok so the judge script treated every HTTP 403 as a missing key. Turns out the firewall also sends a 403 for some shell text…" | 0.04             | 0.03      | 0.89         | `act`      |
-
-</details>
-
-<details>
-<summary><code>log-line.json</code>: a failure log must name the operation and the record, and never leak secrets or personal data</summary>
-
-Four yes/no questions: names the operation, names the record, leaks a secret, leaks personal data. [View the file](examples/batteries/log-line.json).
-
-| Log call                              | Operation | Record | Secret | Personal data | Verdict    |
-| ------------------------------------- | --------- | ------ | ------ | ------------- | ---------- |
-| `charge card failed for order_id=%s`  | 0.99      | 0.98   | 0.04   | 0.04          | `act`      |
-| `payment failed for {customer.email}` | 0.29      | 0.37   | 0.03   | 0.99          | `escalate` |
-| `something went wrong`                | 0.02      | 0.02   | 0.02   | 0.02          | `confirm`  |
-
-</details>
-
-All scores in this section come from real runs.
+To make it run without asking, add one line to your `CLAUDE.md`: _"Before you commit, run the comment battery on every comment the change adds."_ Jev can't count or do arithmetic, so leave rules like "under 72 characters" to code or to Claude. The file format is in the judge skill's [reference](skills/judge/reference.md).
 
 ## Turn the gates on or off
 
@@ -383,7 +245,7 @@ A battery decides how a gate judges. The option decides whether it runs at all. 
 <details>
 <summary><b>How do I run a battery? Do I need to type <code>/sensibility:judge</code>?</b></summary>
 
-Batteries run through the judge skill. The sure way is `/sensibility:judge check this with the migration battery`. Plain wording like "check this with the migration battery" also works, because Claude loads the judge skill itself when you mention a battery. You never call a battery directly, and it doesn't have a command of its own.
+Batteries run through the judge skill. The sure way is `/sensibility:judge check this with the comment battery`. Plain wording like "check this with the comment battery" also works, because Claude loads the judge skill itself when you mention a battery. You never call a battery directly, and it doesn't have a command of its own.
 
 </details>
 
@@ -411,7 +273,7 @@ Only if you're writing an app that calls Jev from its own code. That skill teach
 <details>
 <summary><b>How much does it cost, and how slow is it?</b></summary>
 
-One judgment (several questions answered together) takes about 0.5 s and costs about $0.00005. With the Risk gate on, 50 Bash commands cost about $0.003 in total. The plugin adds about 189 tokens to each Claude session.
+One judgment (several questions answered together) takes about 0.5 s and costs about $0.00005. With the Risk gate on, 50 Bash commands cost about $0.003 in total. The plugin adds about 100 tokens to each Claude session.
 
 </details>
 
