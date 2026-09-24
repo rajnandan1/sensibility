@@ -78,7 +78,7 @@ flowchart LR
 
 | Gate        | Runs when                 | What it does                                                                                                                                                   | Default |
 | ----------- | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
-| Finish gate | Claude ends a turn        | If Claude stopped short (offered to do the work instead of doing it, asked permission you already gave, ended on a plan), Claude gets one nudge to keep going. | **on**  |
+| Finish gate | Claude ends a turn        | If Claude stopped short (offered to do the work instead of doing it, asked permission you already gave, ended on a plan), Claude gets one nudge to keep going. | **off** |
 | Risk gate   | Before every Bash command | If a command is risky and destructive, or risky and outside what you asked for, Claude Code stops and asks you first.                                          | **off** |
 
 To save a check of your own as a battery, see [Batteries](#batteries).
@@ -212,7 +212,7 @@ From a terminal:
 
 ```sh
 claude plugin install sensibility@sensibility --config bash_gate=true    # Risk gate on
-claude plugin install sensibility@sensibility --config stop_gate=false   # Finish gate off
+claude plugin install sensibility@sensibility --config stop_gate=true    # Finish gate on
 ```
 
 Use `=true` or `=false` with either name. The command works even when the plugin is already installed. Run `/reload-plugins` or restart Claude Code afterwards.
@@ -224,7 +224,7 @@ You can also run `/plugin configure sensibility@sensibility` inside Claude Code,
 <details>
 <summary><b>How do I see my current settings?</b></summary>
 
-Look for `sensibility@sensibility` under `pluginConfigs` in `~/.claude/settings.json`. If it isn't there, you're on the defaults: Finish gate on, Risk gate off. `claude plugin details sensibility@sensibility` lists what the plugin installs.
+Look for `sensibility@sensibility` under `pluginConfigs` in `~/.claude/settings.json`. If it isn't there, you're on the defaults: both gates off. `claude plugin details sensibility@sensibility` lists what the plugin installs.
 
 </details>
 
@@ -299,9 +299,9 @@ Jev's answers wander by a few hundredths between identical calls. The built-in t
 </details>
 
 <details>
-<summary><b>Why is the Finish gate on and the Risk gate off?</b></summary>
+<summary><b>Why are both gates off by default?</b></summary>
 
-The Finish gate costs nothing unless it fires. In testing on 51 real turns, the Finish gate fired 3 times and was right about once; each wrong nudge costs one extra Claude turn. The Risk gate adds about 0.5 s to every Bash command, so it's opt-in. It stops force pushes, `DROP TABLE` and `rm -rf ~`. On 100 real Bash commands its current rules asked once, down from 7 with the first version; the 6 it no longer asks about were `gh` writes the user had requested.
+Each gate calls Jev on every event it watches, so each adds about 0.5 s there: the Risk gate to every Bash command, the Finish gate to the end of every turn. In testing on 51 real turns, the Finish gate fired 3 times and was right about once; each wrong nudge costs one extra Claude turn. The Risk gate stops force pushes, `DROP TABLE` and `rm -rf ~`. On 100 real Bash commands its current rules asked once, down from 7 with the first version; the 6 it no longer asks about were `gh` writes the user had requested.
 
 </details>
 

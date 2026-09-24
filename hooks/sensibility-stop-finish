@@ -13,7 +13,7 @@ NUDGES = {
 
 
 def main(event):
-    if not hook.enabled("STOP_GATE", "true") or event.get("stop_hook_active"):
+    if not hook.enabled("STOP_GATE", "false") or event.get("stop_hook_active"):
         return
     state = {"prompt": hook.last_prompt(event.get("transcript_path", "")), "reply": event.get("last_assistant_message", "")}
     judged, warning = hook.judge("finish", state, event)
