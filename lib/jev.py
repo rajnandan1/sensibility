@@ -5,7 +5,7 @@ import time
 import urllib.error
 import urllib.request
 
-MODEL = os.environ.get("TYPESAFE_DEFAULT_MODEL") or "jev-1.13.0"
+MODEL = os.environ.get("TYPESAFE_DEFAULT_MODEL") or "jev-1.14.0"
 BASE_URL = os.environ.get("TYPESAFE_BASE_URL") or "https://api.typesafe.ai"
 STATE_BUDGET = 32000
 TOTAL_BUDGET = 64000
