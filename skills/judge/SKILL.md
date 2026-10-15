@@ -26,7 +26,7 @@ ${CLAUDE_PLUGIN_ROOT}/skills/judge/scripts/judge.py --list
 - Do not also `cat` or Read a file you pass with `--state-file`; the script reads it so your context stays clean.
 - Budgets: about 32k tokens of state plus the longest question, 64k in total. Over budget the script refuses; filter the state to what the questions need, never truncate blindly.
 
-Output is one JSON line: `{"answers":{...},"model":"jev-1.13.0","ms":412}`, plus `"verdict"` and `"rule"` when a battery has a gate.
+Output is one JSON line: `{"answers":{...},"model":"jev-1.14.0","ms":412}`, plus `"verdict"` and `"rule"` when a battery has a gate.
 
 ## Errors
 

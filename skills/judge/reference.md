@@ -14,7 +14,7 @@
 | 1 | `network` | Could not reach `https://api.typesafe.ai` | Tell the user |
 | 1 | `battery` | No battery by that name | Run `--list` |
 
-`TYPESAFE_DEFAULT_MODEL` overrides the pinned `jev-1.13.0`; `TYPESAFE_BASE_URL` overrides the endpoint. Thresholds in the built-in batteries were tuned on `jev-1.13.0`.
+`TYPESAFE_DEFAULT_MODEL` overrides the pinned `jev-1.14.0`; `TYPESAFE_BASE_URL` overrides the endpoint. Thresholds in the built-in batteries were tuned on `jev-1.13.0`. On `jev-1.14.0`, 31 known cases across the five built-in batteries gave the same gate verdicts as on `jev-1.13.0`, checked 2026-10-15.
 
 ## More of Jev's weak spots
 
