@@ -4,6 +4,8 @@ Sensibility gives Claude Code a second opinion it can ask for in half a second.
 
 Claude makes lots of small calls while it works: does this diff match the ticket, is this commit message honest, is this shell command safe to run, did I actually finish what was asked. Sensibility lets Claude hand those calls to [Jev](https://docs.typesafe.ai), a model from TypeSafe that only answers questions. Jev doesn't write code or text. You give it some text and a few questions, and it returns a probability for each answer in about 0.5 s, for about $0.00005.
 
+Sensibility also helps you pick a skill. Type `/sensibility:which <prompt>` and it prints the skill to put in front of your prompt. See [Pick a skill for your prompt](#pick-a-skill-for-your-prompt).
+
 ## Quick start
 
 **1. Install the plugin.** In Claude Code:
@@ -206,6 +208,43 @@ Real answers:
 
 To make it run without asking, add one line to your `CLAUDE.md`: _"Before you commit, run the comment battery on every comment the change adds."_ Jev can't count or do arithmetic, so leave rules like "under 72 characters" to code or to Claude. The file format is in the judge skill's [reference](skills/judge/reference.md).
 
+## Pick a skill for your prompt
+
+You have many skills and you forget which one fits. Type your prompt after `/sensibility:which`:
+
+```
+/sensibility:which https://github.com/acme/api/pull/412
+```
+
+It prints the line to paste, one reason, and a runner-up:
+
+```
+/pr-comments https://github.com/acme/api/pull/412
+why: Sweep a pull request's live review threads until clean. You ran it 161 times.
+runner-up: /mattpocock-skills:code-review
+```
+
+How it picks:
+
+1. The script reads every skill you can type as a slash command on this machine: your own skills, your project's, and your plugins'. It includes skills that Claude can't see (`disable-model-invocation: true`). Built-in commands such as `/loop` are not files, so they are not included.
+2. Jev reads your prompt and every skill's description, and ranks the skills in one call.
+3. The script moves the skills you use most toward the top. It reads the counts that Claude Code keeps in `~/.claude.json`. This step matters most, because Jev reads words literally. On 395 of the author's past prompts, the right skill came first 54% of the time with this step and 17% without it.
+
+When Jev finds no clear fit, the Pick ends with a `weak match:` line. Then the Pick is a guess from your habits.
+
+A Lens is a skill that rewrites your prompt and does not do the task. `which` knows four Lenses: `higher`, `deeper`, `wider` and `prompt-master`. It suggests one only when you have it installed and Jev says your prompt needs it:
+
+```
+/wider build a dashboard for sales, finance and design teams to track churn
+why: Several kinds of people will judge the result, so methods from other fields help.
+next: Run /sensibility:which on the rewrite that /wider gives you.
+skip the Lens: /posthog:building-a-dashboard build a dashboard for sales, finance and design teams to track churn
+```
+
+Run the Lens, then run `which` again on the rewrite. If you don't want the Lens, paste the `skip the Lens:` line.
+
+`which` only gives advice. It never runs the skill it picks. Claude never runs `which` on its own: only you can type it.
+
 ## Turn the gates on or off
 
 From a terminal:
@@ -259,7 +298,7 @@ No. The judge skill runs any battery by name. Claude doesn't know yours exists u
 <details>
 <summary><b>Can Sensibility pick the right skill or tool for Claude?</b></summary>
 
-Not today. Someone built this as a Jev hook ([`shimo4228/jev-skill-router`](https://github.com/shimo4228/jev-skill-router)). The author concluded it doesn't help a strong model, because Claude already sees every skill's description. It also cost 10k to 25k tokens and up to 1.6 s on every prompt.
+For you, yes: type `/sensibility:which <prompt>` (see [Pick a skill for your prompt](#pick-a-skill-for-your-prompt)). For Claude, no. Someone built that as a Jev hook ([`shimo4228/jev-skill-router`](https://github.com/shimo4228/jev-skill-router)). The author concluded it doesn't help a strong model, because Claude already sees every skill's description. It also cost 10k to 25k tokens and up to 1.6 s on every prompt. `which` runs only when you type it, and it also sees the skills Claude can't.
 
 </details>
 
@@ -273,7 +312,7 @@ Only if you're writing an app that calls Jev from its own code. That skill teach
 <details>
 <summary><b>How much does it cost, and how slow is it?</b></summary>
 
-One judgment (several questions answered together) takes about 0.5 s and costs about $0.00005. With the Risk gate on, 50 Bash commands cost about $0.003 in total. The plugin adds about 100 tokens to each Claude session.
+One judgment (several questions answered together) takes about 0.5 s and costs about $0.00005. With the Risk gate on, 50 Bash commands cost about $0.003 in total. One `which` call sends about 34,000 tokens (your prompt plus every skill's description), takes about 1 s and costs about $0.0014. The plugin adds about 100 tokens to each Claude session.
 
 </details>
 
@@ -308,7 +347,7 @@ Each gate calls Jev on every event it watches, so each adds about 0.5 s there: t
 <details>
 <summary><b>What leaves my machine, and what's logged?</b></summary>
 
-For each gate judgment, your last prompt plus the command or reply being judged goes to TypeSafe's API. Each gate judgment is also appended to `judgments.jsonl` under `~/.claude/plugins/data/` (you can delete it any time). Judge skill calls aren't logged. If your prompts or commands must stay on your machine, turn both gates off.
+For each gate judgment, your last prompt plus the command or reply being judged goes to TypeSafe's API. Each gate judgment is also appended to `judgments.jsonl` under `~/.claude/plugins/data/` (you can delete it any time). Judge skill calls aren't logged. When you run `which`, your prompt plus the name and description of every skill on your machine go to TypeSafe, and nothing is logged. If your prompts or commands must stay on your machine, turn both gates off and don't use `which`.
 
 </details>
 
