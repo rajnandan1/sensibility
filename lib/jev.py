@@ -83,7 +83,11 @@ def ask(state, questions, timeout=10.0, retries=3):
             if e.code in (429, 529):
                 raise JevError("busy", f"Jev is busy (HTTP {e.code}) after retries. Try again shortly.", 3)
             raise JevError("request", f"HTTP {e.code}: {detail}", 1)
-        except (urllib.error.URLError, TimeoutError) as e:
+        except OSError as e:
+            if attempt < retries and time.monotonic() + delay < deadline:
+                time.sleep(delay)
+                delay *= 2
+                continue
             raise JevError("network", f"Could not reach {BASE_URL}: {e}", 1)
     raise JevError("busy", "Jev is busy after retries. Try again shortly.", 3)
 

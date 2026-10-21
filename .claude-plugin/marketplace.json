@@ -1,7 +1,7 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "sensibility",
-  "description": "Typed judgments from TypeSafe's Jev while Claude works: a judge skill and two opt-in gates, Risk on Bash commands and Finish on Claude's final reply.",
+  "description": "Typed judgments from TypeSafe's Jev while Claude works: a judge skill, two opt-in gates (Risk on Bash commands, Finish on Claude's final reply), and a which skill that picks the skill for your prompt.",
   "owner": {
     "name": "Raj Nandan Sharma",
     "url": "https://github.com/rajnandan1"

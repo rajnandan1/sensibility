@@ -63,3 +63,19 @@ _Avoid_: safety hook, bash guard, risk score
 **Taste**:
 A battery made of Score questions over quality dimensions, whose answers say how good something is, not whether it is allowed.
 _Avoid_: quality check, review, grade
+
+**Roster**:
+Every skill installed in Claude Code on this machine that the user can type as a slash command, visible to Claude or hidden from it.
+_Avoid_: skill list, catalog, index
+
+**Lens**:
+A skill whose output is a rewritten prompt, not the task's result; today `higher`, `deeper`, `wider` and `prompt-master`.
+_Avoid_: prompt skill, rewriter, meta-skill
+
+**Pick**:
+What the `which` skill prints for one prompt: one task skill from the Roster, or one Lens alone with a line to run `which` again on its rewrite; plus one reason and one runner-up.
+_Avoid_: suggestion, recommendation, route
+
+**Use count**:
+How many times Claude Code ran a skill on this machine, as `skillUsage.<name>.usageCount` in `~/.claude.json`; `which` reorders Jev's top candidates by it.
+_Avoid_: prior, frequency, popularity
