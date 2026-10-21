@@ -74,12 +74,16 @@ def answers(h0, h1, **nouls):
 
 
 def test_pick():
-    roster = [{"name": "a", "description": "Does a. Then more."}, {"name": "b", "description": ""}, {"name": "c", "description": "C."}]
+    roster = [{"name": "a", "description": "Does a. Then more."}, {"name": "b", "description": ""}, {"name": "c", "description": "C."},
+              {"name": "d", "description": "Does d"}]
     usage = {"a": 10, "c": 1}
     task = answers({"a": 0.5, "c": 0.1, "none": 0.4}, {"b": 0.6, "none": 0.4}, deeper=0.2, ready=0.1)
     assert which.pick("fix it", task, roster, usage) == ["/a fix it", "why: Does a. You ran it 10 times.", "runner-up: /b"]
     weak = answers({"none": 0.7, "a": 0.2}, {"none": 0.8, "b": 0.15})
     assert which.pick("hm", weak, roster, {"b": 1})[1:] == ["why: You ran it 1 time.", "runner-up: /a", which.WEAK_MATCH]
+    heavy = answers({"a": 0.28, "none": 0.48}, {"d": 0.08, "none": 0.48})
+    assert which.pick("start x", heavy, roster, {"a": 11, "d": 301})[:3] == ["/a start x", "why: Does a. You ran it 11 times.", "runner-up: /d"]
+    assert which.pick("start x", heavy, roster, {"d": 301})[1] == "why: Does d. You ran it 301 times."
     lens = answers({"a": 0.5, "none": 0.5}, {"b": 0.6, "none": 0.4}, deeper=0.8, wider=0.75, ready=0.2)
     assert which.pick("make x", lens, roster, usage) == [
         "/deeper make x",
@@ -89,6 +93,27 @@ def test_pick():
     ]
     lens["ready"]["noul"] = 0.5
     assert which.pick("make x", lens, roster, usage)[0] == "/a make x"
+
+
+def test_main_sends_context():
+    states = []
+
+    def ask(state, questions):
+        states.append(state)
+        raise jev.JevError("busy", "", 3)
+
+    real_ask, real_argv = jev.ask, which.sys.argv
+    jev.ask = ask
+    try:
+        for argv in (["--context", " T: body ", "start X-1"], ["start X-1"]):
+            which.sys.argv = ["which.py", *argv]
+            try:
+                which.main()
+            except SystemExit:
+                pass
+    finally:
+        jev.ask, which.sys.argv = real_ask, real_argv
+    assert states == [{"prompt": "start X-1", "context": "T: body"}, {"prompt": "start X-1"}]
 
 
 def hook(command):
@@ -101,6 +126,7 @@ def hook(command):
 def test_hook_allows_quoted_prompt():
     script = "/plug/skills/which/scripts/which.py "
     assert hook(script + "'it'\\''s `ls` and $(id)\nline two'") == "allow"
+    assert hook(script + "--context 'T: `/agent/query` $x' 'start X-1'") == "allow"
     assert hook("/plug/skills/judge/scripts/judge.py --list") == "allow"
     assert hook(script + "'a'; rm -rf ~") is None
     assert hook(script + "$(id)") is None

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import glob
 import json
+import math
 import os
 import re
 import sys
@@ -16,6 +17,7 @@ NEVER_PICKED = {"ken:ken", "ponytail:ponytail", "i-have-adhd:i-have-adhd", "sens
 REORDER_DEPTH = 6
 READY_THRESHOLD = 0.5
 DESCRIPTION_CHARS = 1536
+CONTEXT_CHARS = 4000
 WEAK_MATCH = "weak match: Jev found no clear fit, so this Pick leans on how often you use the skill."
 TASK_QUESTION = (
     "The user typed the request in `prompt` and wants to prefix it with one skill. "
@@ -252,7 +254,7 @@ def use_counts():
 
 def ranked(answers, usage):
     candidates = sorted(((p, name) for half in ("h0", "h1") for name, p in answers[half]["probabilities"].items() if name != "none"), reverse=True)
-    return [name for _, name in sorted(((p * (usage.get(name, 0) + 1), name) for p, name in candidates[:REORDER_DEPTH]), reverse=True)]
+    return [name for _, name in sorted(((p * math.log2(usage.get(name, 0) + 2), name) for p, name in candidates[:REORDER_DEPTH]), reverse=True)]
 
 
 def lens(answers):
@@ -263,7 +265,8 @@ def lens(answers):
 
 
 def first_sentence(text):
-    return re.match(r".*?[.!?](?=\s|$)|.*", text).group(0)
+    sentence = re.match(r".*?[.!?](?=\s|$)|.*", text).group(0).rstrip()
+    return sentence + "." if sentence and sentence[-1] not in ".!?" else sentence
 
 
 def pick(prompt, answers, roster, usage):
@@ -287,12 +290,15 @@ def pick(prompt, answers, roster, usage):
 
 
 def main():
-    prompt = " ".join(sys.argv[1:]).strip()
+    args, context = sys.argv[1:], ""
+    if args[:1] == ["--context"] and len(args) > 1:
+        context, args = args[1].strip()[:CONTEXT_CHARS], args[2:]
+    prompt = " ".join(args).strip()
     try:
         if not prompt:
             raise jev.JevError("usage", "Type a prompt after /sensibility:which.", 1)
         roster = scan(Path.cwd())
-        reply = jev.ask({"prompt": prompt}, questions(roster))
+        reply = jev.ask({"prompt": prompt, **({"context": context} if context else {})}, questions(roster))
     except jev.JevError as e:
         jev.fail(e)
     print("\n".join(pick(prompt, reply["answers"], roster, use_counts())))
