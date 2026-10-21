@@ -227,7 +227,7 @@ runner-up: /mattpocock-skills:code-review
 How it picks:
 
 1. The script reads every skill you can type as a slash command on this machine: your own skills, your project's, and your plugins'. It includes skills that Claude can't see (`disable-model-invocation: true`). Built-in commands such as `/loop` are not files, so they are not included.
-2. Jev reads your prompt and every skill's description, and ranks the skills in one call.
+2. Jev reads your prompt and every skill's description, and ranks the skills in one call. If your prompt names a ticket or link that Claude can read with its tools, such as a Linear id, Claude reads the title and description first and sends them with your prompt. On `start PRO-3113`, this changed the Pick from `/orca-cli` to `/mattpocock-skills:implement`.
 3. The script moves the skills you use most toward the top. It reads the counts that Claude Code keeps in `~/.claude.json`. This step matters most, because Jev reads words literally. On 395 of the author's past prompts, the right skill came first 54% of the time with this step and 17% without it.
 
 When Jev finds no clear fit, the Pick ends with a `weak match:` line. Then the Pick is a guess from your habits.
@@ -347,7 +347,7 @@ Each gate calls Jev on every event it watches, so each adds about 0.5 s there: t
 <details>
 <summary><b>What leaves my machine, and what's logged?</b></summary>
 
-For each gate judgment, your last prompt plus the command or reply being judged goes to TypeSafe's API. Each gate judgment is also appended to `judgments.jsonl` under `~/.claude/plugins/data/` (you can delete it any time). Judge skill calls aren't logged. When you run `which`, your prompt plus the name and description of every skill on your machine go to TypeSafe, and nothing is logged. If your prompts or commands must stay on your machine, turn both gates off and don't use `which`.
+For each gate judgment, your last prompt plus the command or reply being judged goes to TypeSafe's API. Each gate judgment is also appended to `judgments.jsonl` under `~/.claude/plugins/data/` (you can delete it any time). Judge skill calls aren't logged. When you run `which`, your prompt plus the name and description of every skill on your machine go to TypeSafe, and nothing is logged. If your prompt names a ticket or link, its title and description go to TypeSafe too. If your prompts or commands must stay on your machine, turn both gates off and don't use `which`.
 
 </details>
 
