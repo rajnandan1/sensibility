@@ -233,13 +233,15 @@ def scan(cwd):
     return roster
 
 
+def skill_question(skills):
+    criteria = {s["name"]: s["description"] or None for s in skills}
+    criteria["none"] = "No skill in this list fits the request."
+    return {"type": "choice", "instructions": TASK_QUESTION, "criteria": criteria}
+
+
 def questions(roster):
     tasks = sorted((s for s in roster if s["name"] not in LENSES and s["name"] not in NEVER_PICKED), key=lambda s: s["name"])
-    qs = {}
-    for i, half in enumerate((tasks[0::2], tasks[1::2])):
-        criteria = {s["name"]: s["description"] or None for s in half}
-        criteria["none"] = "No skill in this list fits the request."
-        qs[f"h{i}"] = {"type": "choice", "instructions": TASK_QUESTION, "criteria": criteria}
+    qs = {f"h{i}": skill_question(half) for i, half in enumerate((tasks[0::2], tasks[1::2]))}
     lenses = sorted(LENSES.keys() & {s["name"] for s in roster})
     qs.update({name: LENSES[name]["noul"] for name in lenses})
     if lenses:
@@ -252,8 +254,19 @@ def use_counts():
     return {name: entry.get("usageCount", 0) for name, entry in usage.items() if isinstance(entry, dict)}
 
 
+def finalists(answers):
+    fits = sorted(((p, name) for half in ("h0", "h1") for name, p in answers[half]["probabilities"].items()
+                   if name != "none" and p >= answers[half]["probabilities"].get("none", 0)), reverse=True)
+    return [name for _, name in fits[:REORDER_DEPTH]]
+
+
 def ranked(answers, usage):
-    candidates = sorted(((p, name) for half in ("h0", "h1") for name, p in answers[half]["probabilities"].items() if name != "none"), reverse=True)
+    if "final" in answers:
+        probabilities = answers["final"]["probabilities"]
+    else:
+        fits = finalists(answers)
+        probabilities = {name: p for half in ("h0", "h1") for name, p in answers[half]["probabilities"].items() if not fits or name in fits}
+    candidates = sorted(((p, name) for name, p in probabilities.items() if name != "none"), reverse=True)
     return [name for _, name in sorted(((p * math.log2(usage.get(name, 0) + 2), name) for p, name in candidates[:REORDER_DEPTH]), reverse=True)]
 
 
@@ -283,7 +296,8 @@ def pick(prompt, answers, roster, usage):
     count = usage.get(top, 0)
     description = {s["name"]: s["description"] for s in roster}[top]
     lines = [f"/{top} {prompt}", " ".join(filter(None, ["why:", first_sentence(description), f"You ran it {count} time{'' if count == 1 else 's'}."]))]
-    lines += [f"runner-up: /{name}" for name in order[1:2]]
+    final = answers.get("final", {}).get("probabilities")
+    lines += [f"runner-up: /{name}" for name in order[1:2] if not final or final[name] >= final.get("none", 0)]
     if all(answers[half]["choice"] == "none" for half in ("h0", "h1")):
         lines.append(WEAK_MATCH)
     return lines
@@ -298,10 +312,14 @@ def main():
         if not prompt:
             raise jev.JevError("usage", "Type a prompt after /sensibility:which.", 1)
         roster = scan(Path.cwd())
-        reply = jev.ask({"prompt": prompt, **({"context": context} if context else {})}, questions(roster))
+        state = {"prompt": prompt, **({"context": context} if context else {})}
+        answers = jev.ask(state, questions(roster))["answers"]
+        fits = finalists(answers)
+        if len(fits) > 1:
+            answers["final"] = jev.ask(state, {"final": skill_question([s for s in roster if s["name"] in fits])})["answers"]["final"]
     except jev.JevError as e:
         jev.fail(e)
-    print("\n".join(pick(prompt, reply["answers"], roster, use_counts())))
+    print("\n".join(pick(prompt, answers, roster, use_counts())))
 
 
 if __name__ == "__main__":

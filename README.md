@@ -216,7 +216,7 @@ You have many skills and you forget which one fits. Type your prompt after `/sen
 /sensibility:which https://github.com/acme/api/pull/412
 ```
 
-It prints the line to paste, one reason, and a runner-up:
+It prints the line to paste, one reason, and a runner-up when a second skill fits:
 
 ```
 /pr-comments https://github.com/acme/api/pull/412
@@ -227,8 +227,8 @@ runner-up: /mattpocock-skills:code-review
 How it picks:
 
 1. The script reads every skill you can type as a slash command on this machine: your own skills, your project's, and your plugins'. It includes skills that Claude can't see (`disable-model-invocation: true`). Built-in commands such as `/loop` are not files, so they are not included.
-2. Jev reads your prompt and every skill's description, and ranks the skills in one call. If your prompt names a ticket or link that Claude can read with its tools, such as a Linear id, Claude reads the title and description first and sends them with your prompt. On `start PRO-3113`, this changed the Pick from `/orca-cli` to `/mattpocock-skills:implement`.
-3. The script moves the skills you use most toward the top. It reads the counts that Claude Code keeps in `~/.claude.json`. This step matters most, because Jev reads words literally. On 395 of the author's past prompts, the right skill came first 54% of the time with this step and 17% without it.
+2. Jev reads your prompt and every skill's description, split into two lists, and marks each skill it rates at least as high as "no skill fits". When two or more skills fit, a second call asks Jev to compare only those skills, so a skill you have never run can still win. If your prompt names a ticket or link that Claude can read with its tools, such as a Linear id, Claude reads the title and description first and sends them with your prompt. On `start PRO-3113`, this changed the Pick from `/orca-cli` to `/mattpocock-skills:implement`.
+3. The script moves the skills you use most toward the top, among the skills that fit. It reads the counts that Claude Code keeps in `~/.claude.json`. This step matters most, because Jev reads words literally. On 395 of the author's past prompts, the right skill came first 54% of the time with this step and 17% without it (measured on 0.7.0).
 
 When Jev finds no clear fit, the Pick ends with a `weak match:` line. Then the Pick is a guess from your habits.
 

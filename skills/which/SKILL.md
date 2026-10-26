@@ -1,6 +1,6 @@
 ---
 name: which
-description: Pick the skill to put in front of your prompt. Type /sensibility:which <prompt>. It prints the line to paste, one reason and one runner-up.
+description: Pick the skill to put in front of your prompt. Type /sensibility:which <prompt>. It prints the line to paste, one reason and, when a second skill fits, one runner-up.
 argument-hint: <prompt>
 disable-model-invocation: true
 ---

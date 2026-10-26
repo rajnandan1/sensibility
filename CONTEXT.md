@@ -73,8 +73,12 @@ A skill whose output is a rewritten prompt, not the task's result; today `higher
 _Avoid_: prompt skill, rewriter, meta-skill
 
 **Pick**:
-What the `which` skill prints for one prompt: one task skill from the Roster, or one Lens alone with a line to run `which` again on its rewrite; plus one reason and one runner-up.
+What the `which` skill prints for one prompt: one task skill from the Roster, or one Lens alone with a line to run `which` again on its rewrite; plus one reason and, when a second skill fits, one runner-up.
 _Avoid_: suggestion, recommendation, route
+
+**Finalist**:
+A skill that Jev scores at least as high as `none` in its half of the Roster; when two or more exist, `which` asks Jev a second time to compare only them.
+_Avoid_: fit, candidate, shortlist
 
 **Use count**:
 How many times Claude Code ran a skill on this machine, as `skillUsage.<name>.usageCount` in `~/.claude.json`; `which` reorders Jev's top candidates by it.
