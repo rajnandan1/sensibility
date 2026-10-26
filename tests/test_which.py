@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import contextlib
 import importlib.util
 import io
 import json
@@ -84,6 +85,13 @@ def test_pick():
     heavy = answers({"a": 0.28, "none": 0.48}, {"d": 0.08, "none": 0.48})
     assert which.pick("start x", heavy, roster, {"a": 11, "d": 301})[:3] == ["/a start x", "why: Does a. You ran it 11 times.", "runner-up: /d"]
     assert which.pick("start x", heavy, roster, {"d": 301})[1] == "why: Does d. You ran it 301 times."
+    below_none = answers({"none": 0.37, "c": 0.2, "d": 0.13}, {"a": 0.8, "none": 0.13, "b": 0.02})
+    assert which.pick("work on x", below_none, roster, {"a": 69, "d": 2}) == ["/a work on x", "why: Does a. You ran it 69 times."]
+    new_skill = answers({"c": 0.9, "none": 0.1}, {"a": 0.8, "none": 0.2})
+    new_skill["final"] = {"choice": "c", "probabilities": {"c": 0.9, "a": 0.1, "none": 0.0}}
+    assert which.pick("do x", new_skill, roster, {"a": 69}) == ["/c do x", "why: C. You ran it 0 times.", "runner-up: /a"]
+    new_skill["final"]["probabilities"] = {"c": 0.96, "a": 0.01, "none": 0.03}
+    assert which.pick("do x", new_skill, roster, {"a": 69}) == ["/c do x", "why: C. You ran it 0 times."]
     lens = answers({"a": 0.5, "none": 0.5}, {"b": 0.6, "none": 0.4}, deeper=0.8, wider=0.75, ready=0.2)
     assert which.pick("make x", lens, roster, usage) == [
         "/deeper make x",
@@ -114,6 +122,35 @@ def test_main_sends_context():
     finally:
         jev.ask, which.sys.argv = real_ask, real_argv
     assert states == [{"prompt": "start X-1", "context": "T: body"}, {"prompt": "start X-1"}]
+
+
+def test_main_asks_final_round_for_two_finalists():
+    roster = [{"name": n, "description": f"{n} does it."} for n in ("a", "b", "c")]
+    asked, first = [], {}
+
+    def ask(state, questions):
+        asked.append({name: list(q["criteria"]) for name, q in questions.items()})
+        if "final" in questions:
+            return {"answers": {"final": {"choice": "b", "probabilities": {"a": 0.2, "b": 0.7, "none": 0.1}}}}
+        return {"answers": first}
+
+    def run(h0, h1):
+        first.clear()
+        first.update(answers(h0, h1))
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            which.main()
+        return out.getvalue().splitlines()[0]
+
+    real_ask, real_scan, real_argv = jev.ask, which.scan, which.sys.argv
+    jev.ask, which.scan, which.sys.argv = ask, lambda cwd: roster, ["which.py", "x"]
+    try:
+        assert run({"a": 0.5, "c": 0.1, "none": 0.4}, {"b": 0.6, "none": 0.4}) == "/b x"
+        assert asked[1] == {"final": ["a", "b", "none"]}, asked
+        assert run({"a": 0.3, "c": 0.1, "none": 0.6}, {"b": 0.6, "none": 0.4}) == "/b x"
+        assert len(asked) == 3, asked
+    finally:
+        jev.ask, which.scan, which.sys.argv = real_ask, real_scan, real_argv
 
 
 def hook(command):
