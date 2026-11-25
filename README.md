@@ -6,6 +6,8 @@ Claude makes lots of small calls while it works: does this diff match the ticket
 
 Sensibility also helps you pick a skill. Type `/sensibility:which <prompt>` and it prints the skill to put in front of your prompt. See [Pick a skill for your prompt](#pick-a-skill-for-your-prompt).
 
+Sensibility also pulls the parts of a long file that matter for your goal into a short Markdown file. See [Pull takeaways from a file](#pull-takeaways-from-a-file).
+
 ## Quick start
 
 **1. Install the plugin.** In Claude Code:
@@ -94,6 +96,7 @@ To save a check of your own as a battery, see [Batteries](#batteries).
 | Rate a PR or issue description    | "Use the sensibility judge to score how clear this PR description is: ..."                                                      | `clarity` battery                   |
 | Pick between options              | "Use the sensibility judge to pick which of these three approaches best fits the ticket"                                        | questions Claude writes on the spot |
 | Save a rule as a check            | "Use the sensibility judge to save a battery called migration: a database migration must be reversible and must not lock a large table" | Claude writes the JSON, then `judge.py migration` |
+| Pull what matters out of a file   | "Read notes/greatwork.html and pull what matters for my creativity skill"                                                       | [`takeaways` skill](#pull-takeaways-from-a-file) |
 | See every battery                 | "List the sensibility batteries"                                                                                                | `judge.py --list`                   |
 
 ### Example: catching a change the ticket didn't ask for
@@ -245,6 +248,29 @@ Run the Lens, then run `which` again on the rewrite. If you don't want the Lens,
 
 `which` only gives advice. It never runs the skill it picks. Claude never runs `which` on its own: only you can type it.
 
+## Pull takeaways from a file
+
+You have a long article and a goal, and you want only the parts of the article that serve the goal. Save the page as a file in the folder where you started Claude Code, for example with "Save Page As" in your browser. The file can be HTML, plain text or Markdown. Then tell Claude two things, your goal and the file's path, in any words:
+
+```
+/sensibility:takeaways query: I am writing a skill that makes an agent do its best creative work, not average work. file: notes/greatwork.html
+```
+
+The `query:` and `file:` labels in this example are optional. Plain words work too: "read notes/greatwork.html and pull what matters for my creativity skill".
+
+Claude writes `notes/greatwork.takeaways.md`. It holds numbered points, most important first. Each point is one line on how it applies to your goal, followed by the article's exact words as a quote. If that file already exists, Claude asks you before it overwrites the file.
+
+How it works:
+
+1. Claude runs the skill's script, `takeaways.py`, on the file. The script cleans the file, removing HTML tags, scripts and menus, and cuts it into chunks of one paragraph each.
+2. Jev places every chunk on four levels: 0, no bearing on the goal; 1, background only; 2, an idea that applies in general terms; 3, a specific idea the work can use directly. Its answer is a position on that scale, so it can fall between levels, such as 2.6. The script sends Jev 20 chunks per request and makes as many requests as the file needs, so a file of any length works.
+3. The script gives Claude only the chunks at 2.5 or higher, halfway between levels 2 and 3. Claude never reads the rest of the file, so a long page costs little of Claude's context.
+4. Claude merges chunks that make the same point, drops any that miss the goal, and writes the file.
+
+On Paul Graham's [How to Do Great Work](https://paulgraham.com/greatwork.html), the script ran five times and kept 42 to 44 of the essay's 232 chunks each time, in about 3 seconds per run. In two of those runs Claude went on to write the file, and both files had 17 points. A chunk close to the 2.5 cut can land on either side in a repeat run, so two runs on the same file keep slightly different sets.
+
+`takeaways` sends the file's text to TypeSafe, so it needs your TypeSafe key, and it reads only files inside the folder where you started Claude Code. For a file outside that folder, it stops with an error. It does not fetch links. If you give a link, Claude asks you to save the page first.
+
 ## Turn the gates on or off
 
 From a terminal:
@@ -312,7 +338,7 @@ Only if you're writing an app that calls Jev from its own code. That skill teach
 <details>
 <summary><b>How much does it cost, and how slow is it?</b></summary>
 
-One judgment (several questions answered together) takes about 0.5 s and costs about $0.00005. With the Risk gate on, 50 Bash commands cost about $0.003 in total. One `which` call sends about 34,000 tokens (your prompt plus every skill's description), takes about 1 s and costs about $0.0014. The plugin adds about 100 tokens to each Claude session.
+One judgment (several questions answered together) takes about 0.5 s and costs about $0.00005. With the Risk gate on, 50 Bash commands cost about $0.003 in total. One `which` call sends about 34,000 tokens (your prompt plus every skill's description), takes about 1 s and costs about $0.0014. One `takeaways` run on an 11,800-word article sends about 55,000 tokens in 12 requests, takes about 3 s and costs about $0.002. The plugin adds about 100 tokens to each Claude session.
 
 </details>
 
@@ -347,7 +373,7 @@ Each gate calls Jev on every event it watches, so each adds about 0.5 s there: t
 <details>
 <summary><b>What leaves my machine, and what's logged?</b></summary>
 
-For each gate judgment, your last prompt plus the command or reply being judged goes to TypeSafe's API. Each gate judgment is also appended to `judgments.jsonl` under `~/.claude/plugins/data/` (you can delete it any time). Judge skill calls aren't logged. When you run `which`, your prompt plus the name and description of every skill on your machine go to TypeSafe, and nothing is logged. If your prompt names a ticket or link, its title and description go to TypeSafe too. If your prompts or commands must stay on your machine, turn both gates off and don't use `which`.
+For each gate judgment, your last prompt plus the command or reply being judged goes to TypeSafe's API. Each gate judgment is also appended to `judgments.jsonl` under `~/.claude/plugins/data/` (you can delete it any time). Judge skill calls aren't logged. When you run `which`, your prompt plus the name and description of every skill on your machine go to TypeSafe, and nothing is logged. If your prompt names a ticket or link, its title and description go to TypeSafe too. When you run `takeaways`, your goal plus the whole text of the file go to TypeSafe, and nothing is logged. If your prompts, commands or files must stay on your machine, turn both gates off and use neither `which` nor `takeaways`.
 
 </details>
 

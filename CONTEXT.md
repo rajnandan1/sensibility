@@ -64,6 +64,22 @@ _Avoid_: safety hook, bash guard, risk score
 A battery made of Score questions over quality dimensions, whose answers say how good something is, not whether it is allowed.
 _Avoid_: quality check, review, grade
 
+**Query**:
+The user's goal text that `takeaways` places every Chunk against.
+_Avoid_: prompt (the prompt is the whole message)
+
+**Source**:
+The local file that `takeaways` reads: a saved web page, a text file, or a Markdown file.
+_Avoid_: document
+
+**Chunk**:
+One paragraph of a Source, 8 to 400 words, that Jev places on four levels against the Query.
+_Avoid_: passage, snippet, section
+
+**Takeaways file**:
+The Markdown file that `takeaways` writes next to the Source: numbered points, each one line that applies a kept Chunk to the Query, followed by the Source's own words.
+_Avoid_: summary, extract, notes
+
 **Roster**:
 Every skill installed in Claude Code on this machine that the user can type as a slash command, visible to Claude or hidden from it.
 _Avoid_: skill list, catalog, index

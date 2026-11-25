@@ -4,6 +4,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
+from pathlib import Path
 
 MODEL = os.environ.get("TYPESAFE_DEFAULT_MODEL") or "jev-1.14.0"
 BASE_URL = os.environ.get("TYPESAFE_BASE_URL") or "https://api.typesafe.ai"
@@ -90,6 +91,13 @@ def ask(state, questions, timeout=10.0, retries=3):
                 continue
             raise JevError("network", f"Could not reach {BASE_URL}: {e}", 1)
     raise JevError("busy", "Jev is busy after retries. Try again shortly.", 3)
+
+
+def inside_cwd(raw):
+    path = Path(raw).resolve()
+    if Path.cwd().resolve() not in path.parents:
+        raise JevError("state", f"{raw} is outside the working directory.", 1)
+    return path
 
 
 def fail(err):
