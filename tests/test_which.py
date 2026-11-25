@@ -165,6 +165,7 @@ def test_hook_allows_quoted_prompt():
     assert hook(script + "'it'\\''s `ls` and $(id)\nline two'") == "allow"
     assert hook(script + "--context 'T: `/agent/query` $x' 'start X-1'") == "allow"
     assert hook("/plug/skills/judge/scripts/judge.py --list") == "allow"
+    assert hook("/plug/skills/takeaways/scripts/takeaways.py 'a.html' 'it'\\''s a goal'") == "allow"
     assert hook(script + "'a'; rm -rf ~") is None
     assert hook(script + "$(id)") is None
     assert hook(script + "'a'\nrm -rf ~") is None

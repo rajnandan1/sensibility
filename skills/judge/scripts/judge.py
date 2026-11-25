@@ -22,20 +22,13 @@ def git_diff(rng):
     return run.stdout
 
 
-def inside_cwd(raw):
-    path = Path(raw).resolve()
-    if Path.cwd().resolve() not in path.parents:
-        raise jev.JevError("state", f"--state-file {raw} is outside the working directory.", 1)
-    return path
-
-
 def keyed_files(files):
     state = {}
     for spec in files:
         key, _, raw = spec.partition("=")
         if not raw:
             raise jev.JevError("state", f"Mix of key=path and bare --state-file: `{spec}`.", 1)
-        state[key] = inside_cwd(raw).read_text()
+        state[key] = jev.inside_cwd(raw).read_text()
     return state
 
 
@@ -60,7 +53,7 @@ def read_state(inline, files, rng):
     if not files:
         raise jev.JevError("state", "No state: pass --state '<text or json>' or --state-file.", 1)
     if len(files) == 1 and "=" not in files[0]:
-        text = inside_cwd(files[0]).read_text()
+        text = jev.inside_cwd(files[0]).read_text()
         try:
             return json.loads(text)
         except json.JSONDecodeError:

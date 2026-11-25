@@ -1,7 +1,7 @@
 {
   "name": "sensibility",
-  "version": "0.7.2",
-  "description": "Typed judgments from TypeSafe's Jev during Claude's own work: a judge skill, two opt-in gates (Risk on Bash commands, Finish on Claude's final reply), and a which skill that picks the skill for your prompt.",
+  "version": "0.8.0",
+  "description": "Typed judgments from TypeSafe's Jev during Claude's own work: a judge skill, two opt-in gates (Risk on Bash commands, Finish on Claude's final reply), a which skill that picks the skill for your prompt, and a takeaways skill that pulls what matters for your goal out of a file.",
   "author": {
     "name": "Raj Nandan Sharma",
     "url": "https://github.com/rajnandan1"

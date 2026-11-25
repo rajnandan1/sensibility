@@ -42,9 +42,9 @@ def decision(kind, reason):
 
 def main(event):
     command = event.get("tool_input", {}).get("command", "")
-    scripts = tuple(os.path.join(os.environ.get("CLAUDE_PLUGIN_ROOT", ""), f"skills/{s}/scripts/{s}.py ") for s in ("judge", "which"))
+    scripts = tuple(os.path.join(os.environ.get("CLAUDE_PLUGIN_ROOT", ""), f"skills/{s}/scripts/{s}.py ") for s in ("judge", "which", "takeaways"))
     if command.startswith(scripts) and is_simple(command):
-        hook.emit(decision("allow", "sensibility judge or which command"))
+        hook.emit(decision("allow", "sensibility judge, which or takeaways command"))
         return
     if not hook.enabled("BASH_GATE", "false"):
         return
